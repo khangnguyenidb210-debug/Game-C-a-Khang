@@ -28,7 +28,7 @@ let alarmSoundPlaying = false;
 const COOLDOWNS = {
     khang: { y: 3000, u: 10000, i: 5000, o: 15000 },
     dang: { y: 10000, u: 8000, i: 14000, o: 20000 },
-    loi: { y: 5000, u: 10000, i: 4000, o: 20000 }
+    loi: { y: 7000, u: 10000, i: 4000, o: 18000 }
 };
 
 const keys = { w: false, a: false, s: false, d: false };
@@ -284,10 +284,16 @@ function useU() {
     } else if (selectedChar === 'dang') {
         bots.forEach(b => {
             let dx = b.x - player.x, dy = b.y - player.y, d = Math.sqrt(dx * dx + dy * dy);
-            if (d < 5) {
+            if (d < 6) {
                 b.x += (dx / d) * 3;
                 b.y += (dy / d) * 3;
-                b.delayUntil = now + 2500;
+                b.delayUntil = now + 3000;
+            }
+        });
+        bots.forEach(b => {
+            if (checkCollision(b.x, b.y)) {
+                b.x -= (dx / d) * 3;
+                b.y -= (dy / d) * 3;
             }
         });
         spawnShockwave(player.x, player.y, 'rgba(6,182,212,0.8)');
@@ -395,7 +401,7 @@ function update() {
     const isCommonRage = elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
 
     // BOT Specialty Logic
-    if (selectedBot === 'quyen' && elapsed > 15000) {
+    if (selectedBot === 'quyen' && elapsed > 12500) {
         const delayLen = isHard ? 4500 : 3000;
         if (Math.floor(elapsed / 1000) % 10 === 0 && !player.isDelayed && now > player.delayEnd + 5000) {
             player.isDelayed = true;
@@ -423,8 +429,8 @@ function update() {
     } else { statusEl.classList.add('opacity-0'); }
 
     // SPAWN
-    const maxBots = isHard ? [5, 10, 20][currentLevel - 1] : [2, 4, 6][currentLevel - 1];
-    const spawnInterval = isHard ? 2500 : 6000;
+    const maxBots = isHard ? [5, 10, 20][currentLevel - 1] : [3, 5, 7][currentLevel - 1];
+    const spawnInterval = isHard ? 2500 : 4000;
     if (elapsed > 2000 && (bots.length < maxBots) && (now - lastBotSpawnTime > spawnInterval)) {
         bots.push({
             x: 1.5, y: 1.5, delayUntil: now + 500, nextPathUpdate: 0,
