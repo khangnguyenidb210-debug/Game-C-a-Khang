@@ -289,15 +289,15 @@ function useU() {
         bots.forEach(b => {
             let dx = b.x - player.x, dy = b.y - player.y, d = Math.sqrt(dx * dx + dy * dy);
             if (d < 5) {
-                b.x += (dx / d) * 3;
-                b.y += (dy / d) * 3;
+                b.x += (dx / d) * 4;
+                b.y += (dy / d) * 4;
                 b.delayUntil = now + 3000;
             }
         });
         bots.forEach(b => {
             if (checkCollision(b.x, b.y)) {
-                b.x -= (dx / d) * 3;
-                b.y -= (dy / d) * 3;
+                b.x -= (dx / d) * 4;
+                b.y -= (dy / d) * 4;
             }
         });
         spawnShockwave(player.x, player.y, 'rgba(6,182,212,0.8)');
@@ -386,6 +386,12 @@ function useO() {
         });
         spawnShockwave(player.x, player.y, '#6366f1');
         playSfx(80, 'sawtooth', 1.0, 0.5, 400);
+        bots.forEach(b => {
+            if (checkCollision(b.x, b.y)) {
+                b.x -= (dx / d) * 4;
+                b.y -= (dy / d) * 4;
+            }
+        });
     }
     oCD = now + COOLDOWNS[selectedChar].o;
 }
