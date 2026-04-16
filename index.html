@@ -40,6 +40,7 @@
         </div>
 
         <!-- CHAR SELECT -->
+         <h2 class="text-xl font-bold mb-4 text-slate-400 uppercase tracking-widest">Chọn Nhân Vật Chính</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl mb-10">
             <div id="char-khang" onclick="selectChar('khang')" class="group p-6 rounded-2xl border-2 border-slate-800 cursor-pointer transition-all hover:border-green-500 hover:bg-green-500/5">
                 <div class="w-16 h-16 bg-green-500 mx-auto mb-4 rounded-2xl flex items-center justify-center text-4xl font-black shadow-[0_0_30px_rgba(34,197,94,0.5)] group-hover:scale-110 transition-transform text-black">K</div>
@@ -99,6 +100,11 @@
     </div>
 
     <canvas id="game-canvas"></canvas>
+
+    <div id="pause-overlay" class="hidden absolute inset-0 z-[205] bg-black/80 flex flex-col items-center justify-center text-center p-10">
+        <div class="text-5xl font-black uppercase tracking-[0.3em] text-white mb-4">Tạm dừng</div>
+        <div class="text-sm uppercase tracking-[0.4em] text-slate-300">Nhấn Esc hoặc P để tiếp tục</div>
+    </div>
 
     <div id="game-over" class="hidden absolute inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center text-center p-10">
         <h2 id="end-title" class="text-6xl font-black mb-4 text-red-600 italic uppercase">BỊ BẮT RỒI!</h2>

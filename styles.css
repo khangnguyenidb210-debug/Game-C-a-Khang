@@ -18,6 +18,14 @@ body {
     box-shadow: 0 0 60px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(255, 255, 255, 0.05);
 }
 
+#pause-overlay {
+    pointer-events: none;
+}
+
+#pause-overlay > div {
+    max-width: 90%;
+}
+
 .skill-slot {
     position: relative;
     width: 60px;

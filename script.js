@@ -19,7 +19,7 @@ let player = {
 };
 
 let bots = [], particles = [], decoys = [], trails = [], shockwaves = [], traps = [];
-let gameActive = false, startTime = 0, selectedChar = 'khang', gameMode = 'normal', currentLevel = 1;
+let gameActive = false, gamePaused = false, pauseStart = 0, startTime = 0, selectedChar = 'khang', gameMode = 'normal', currentLevel = 1;
 let selectedBot = 'quyen';
 let yCD = 0, uCD = 0, iCD = 0, oCD = 0, freezeEnd = 0, lastBotSpawnTime = 0;
 let shakeAmount = 0, showRoad = false;
@@ -27,11 +27,73 @@ let alarmSoundPlaying = false;
 
 const COOLDOWNS = {
     khang: { y: 3000, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 8000, u: 8000, i: 12000, o: 20000 },
+    dang: { y: 7000, u: 7000, i: 14000, o: 20000 },
     loi: { y: 5000, u: 10000, i: 4000, o: 20000 }
 };
 
 const keys = { w: false, a: false, s: false, d: false };
+
+function setPauseOverlay(show) {
+    const overlay = document.getElementById('pause-overlay');
+    if (!overlay) return;
+    overlay.classList.toggle('hidden', !show);
+}
+
+function shiftTimers(delta) {
+    startTime += delta;
+    yCD += delta; uCD += delta; iCD += delta; oCD += delta;
+    freezeEnd += delta;
+    lastBotSpawnTime += delta;
+    player.ultEnd += delta;
+    player.roadEnd += delta;
+    player.shieldEnd += delta;
+    player.ghostEnd += delta;
+    player.coffeeEnd += delta;
+    player.medalSpeedEnd += delta;
+    player.delayEnd += delta;
+    player.parryEnd += delta;
+    player.invincibleEnd += delta;
+    traps.forEach(t => t.life += delta);
+    decoys.forEach(d => d.lifeEnd += delta);
+    bots.forEach(b => {
+        b.nextPathUpdate += delta;
+        b.delayUntil += delta;
+        b.superRageStart += delta;
+        b.superRageEnd += delta;
+        b.rageUntil += delta;
+    });
+}
+
+function resetInputKeys() {
+    Object.keys(keys).forEach(key => keys[key] = false);
+}
+
+function pauseGame() {
+    if (!gameActive || gamePaused) return;
+    gamePaused = true;
+    pauseStart = Date.now();
+    gameActive = false;
+    resetInputKeys();
+    setPauseOverlay(true);
+    playSfx(220, 'triangle', 0.25, 0.1);
+}
+
+function resumeGame() {
+    if (!gamePaused) return;
+    const delta = Date.now() - pauseStart;
+    shiftTimers(delta);
+    gamePaused = false;
+    gameActive = true;
+    setPauseOverlay(false);
+    playSfx(440, 'triangle', 0.2, 0.12);
+    update();
+}
+
+function togglePause() {
+    if (!gameActive && !gamePaused) return;
+    if (gamePaused) resumeGame();
+    else pauseGame();
+}
 
 /**
  * SOUND ENGINE
@@ -267,17 +329,6 @@ function useI() {
         player.isDelayed = true;
         player.isParrying = true;
         playSfx(1000, 'triangle', 0.4);
-        // parry logic
-        // stand still for 2 seconds, if a bot hits you during this time, you reflect it back, get invincible and stun the bot for 5 seconds
-        // if parry is successful, reduce the cooldown of I by half
-        // this is handled in the collision logic in the game loop
-        setTimeout(() => {
-            if (player.isParrying) {
-                player.isParrying = false;
-                player.isDelayed = false;
-                playSfx(300, 'sine', 0.3);
-            }
-        }, 2000);
     } else if (selectedChar === 'loi') {
         for (let i = 0; i < 2; i++) decoys.push({
             x: player.x + (Math.random() - 0.5),
@@ -357,6 +408,11 @@ function update() {
         player.isDelayed = false;
         document.getElementById('warning-flash').classList.remove('delay-warning');
     }
+    if (player.isParrying && now > player.parryEnd) {
+        player.isParrying = false;
+        player.isDelayed = false;
+        playSfx(300, 'sine', 0.3);
+    }
 
     let isLuomSuperRage = false;
     if (selectedBot === 'luom' && elapsed > 20000) {
@@ -377,7 +433,8 @@ function update() {
     if (elapsed > 2000 && (bots.length < maxBots) && (now - lastBotSpawnTime > spawnInterval)) {
         bots.push({
             x: 1.5, y: 1.5, delayUntil: now + 500, nextPathUpdate: 0,
-            currentPath: [], rageUntil: 0
+            currentPath: [], rageUntil: 0,
+            superRageStart: 0, superRageEnd: 0
         });
         spawnShockwave(1.5, 1.5, '#ef4444');
         lastBotSpawnTime = now;
@@ -453,7 +510,7 @@ function update() {
                 player.isDelayed = false;
                 player.invincibleEnd = now + 2000;
                 player.isParrySuccess = true;
-                b.delayUntil = now + 3500;
+                b.delayUntil = now + 5000;
                 spawnShockwave(player.x, player.y, '#ffffff');
                 bots.forEach(b => {
                     b.superRageStart = now + 2500;
@@ -691,6 +748,10 @@ document.getElementById('start-btn').onclick = () => {
 
 window.addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
+    if (k === 'escape' || k === 'p') {
+        togglePause();
+        return;
+    }
     if (k in keys) keys[k] = true;
     if (gameActive) {
         if (k === 'y') useY();
