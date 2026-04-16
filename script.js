@@ -27,7 +27,7 @@ let alarmSoundPlaying = false;
 
 const COOLDOWNS = {
     khang: { y: 3000, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 7000, u: 7000, i: 14000, o: 20000 },
+    dang: { y: 10000, u: 8000, i: 14000, o: 20000 },
     loi: { y: 5000, u: 10000, i: 4000, o: 20000 }
 };
 
@@ -395,8 +395,8 @@ function update() {
     const isCommonRage = elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
 
     // BOT Specialty Logic
-    if (selectedBot === 'quyen' && elapsed > 10000) {
-        const delayLen = isHard ? 4000 : 3000;
+    if (selectedBot === 'quyen' && elapsed > 15000) {
+        const delayLen = isHard ? 4500 : 3000;
         if (Math.floor(elapsed / 1000) % 10 === 0 && !player.isDelayed && now > player.delayEnd + 5000) {
             player.isDelayed = true;
             player.delayEnd = now + delayLen;
@@ -407,11 +407,6 @@ function update() {
     if (now > player.delayEnd) {
         player.isDelayed = false;
         document.getElementById('warning-flash').classList.remove('delay-warning');
-    }
-    if (player.isParrying && now > player.parryEnd) {
-        player.isParrying = false;
-        player.isDelayed = false;
-        playSfx(300, 'sine', 0.3);
     }
 
     let isLuomSuperRage = false;
@@ -445,14 +440,14 @@ function update() {
     let mult = 1;
     if (player.isDelayed || player.isParrying) mult = 0;
     else if (player.isParrySuccess) {
-        mult = 1.2;
+        mult = 1.5;
         player.isParrySuccess = false;
         iCD = Math.max(iCD - COOLDOWNS[selectedChar].i / 2, now);
     }
     else {
         if (player.isCoffee) mult *= 1.6;
         if (player.isMedalSpeed) mult *= 2.0;
-        if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.5);
+        if (player.isUlt) mult *= (selectedChar === 'dang' ? 3 : 1.6);
     }
     let pSpd = baseSpd * mult;
     if (pSpd > 0) {
@@ -510,11 +505,11 @@ function update() {
                 player.isDelayed = false;
                 player.invincibleEnd = now + 2000;
                 player.isParrySuccess = true;
-                b.delayUntil = now + 5000;
+                b.delayUntil = now + 6000;
                 spawnShockwave(player.x, player.y, '#ffffff');
                 bots.forEach(b => {
-                    b.superRageStart = now + 2500;
-                    b.superRageEnd = now + 5000;
+                    b.superRageStart = now + 3000;
+                    b.superRageEnd = now + 6000;
                 });
                 playSfx(600, 'sawtooth', 0.2);
             } else if (!player.isGhost && freezeEnd < now && (!player.isInvincible || now > player.invincibleEnd)) {
