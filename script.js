@@ -32,6 +32,10 @@ const COOLDOWNS = {
 };
 
 const keys = { w: false, a: false, s: false, d: false };
+const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
+                tin: "https://oj.vnoi.info/organization/cbl/problems", 
+                luom: "http://nguyentran.ddns.net:82/contest"
+}
 
 function setPauseOverlay(show) {
     const overlay = document.getElementById('pause-overlay');
@@ -519,7 +523,7 @@ function update() {
                 });
                 playSfx(600, 'sawtooth', 0.2);
             } else if (!player.isGhost && freezeEnd < now && (!player.isInvincible || now > player.invincibleEnd)) {
-                endGame(false);
+                endGame(false, selectedBot);
             }
         }
     });
@@ -702,15 +706,26 @@ function updateUI(now) {
     setCD('cd-o', oCD, cds.o);
 }
 
-function endGame(win) {
+function endGame(win, bot) {
     gameActive = false;
     document.getElementById('game-over').classList.remove('hidden');
     if (win) {
-        document.getElementById('end-title').innerText = "EZ GAME!";
+        document.getElementById('end-title').innerText = "BẠN THẮNG!";
         document.getElementById('end-title').style.color = "#22c55e";
         document.getElementById('end-subtitle').innerText = "Bạn đã trốn thoát thành công và hãy tận hưởng kỳ nghỉ hè dài đằng đẳng của bạn!";
         playSfx(400, 'sine', 1.0, 0.3, 1500);
-    } else playSfx(60, 'sawtooth', 0.8, 0.4, 30);
+    } else {
+        // replace the link based on the bot, change link color and make the link hyperlink
+        document.getElementById('end-title').innerText = "BỊ BẮT RỒI!";
+        document.getElementById('end-subtitle').innerText = "Từ đây đến hết kỳ nghỉ hè của bạn, phải giải tất cả bài tập tại ";
+        const linkElement = document.createElement('a');
+        linkElement.href = links[bot];
+        linkElement.target = "_blank";
+        linkElement.style.color = "#3b82f6";
+        linkElement.innerText = links[bot];
+        document.getElementById('end-subtitle').appendChild(linkElement);
+        playSfx(60, 'sawtooth', 0.8, 0.4, 30);
+    }
 }
 
 window.selectChar = (c) => {
