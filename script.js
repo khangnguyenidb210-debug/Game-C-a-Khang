@@ -12,7 +12,10 @@ let player = {
     ultEnd: 0, roadEnd: 0, shieldEnd: 0, ghostEnd: 0, coffeeEnd: 0,
     khangDashCount: 0, khangTraps: 5,
     isMedalSpeed: false, medalSpeedEnd: 0,
-    isDelayed: false, delayEnd: 0
+    isDelayed: false, delayEnd: 0,
+    isParrying: false, parryEnd: 0,
+    isInvincible: false, invincibleEnd: 0,
+    isParrySuccess: false
 };
 
 let bots = [], particles = [], decoys = [], trails = [], shockwaves = [], traps = [];
@@ -24,7 +27,7 @@ let alarmSoundPlaying = false;
 
 const COOLDOWNS = {
     khang: { y: 3000, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 5000, u: 10000, i: 15000, o: 20000 },
+    dang: { y: 8000, u: 8000, i: 12000, o: 20000 },
     loi: { y: 5000, u: 10000, i: 4000, o: 20000 }
 };
 
@@ -190,7 +193,9 @@ function useY() {
         player.isCoffee = true;
         player.coffeeEnd = now + 4000;
         yCD = now + COOLDOWNS.dang.y;
-        playSfx(500, 'sine', 0.3, 0.1, 700);
+        showRoad = true;
+        player.roadEnd = now + 5000;
+        playSfx(800, 'triangle', 0.4);
     } else if (selectedChar === 'loi') {
         let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
         if (!dx && !dy) dy = -1;
@@ -257,10 +262,22 @@ function useI() {
     if (selectedChar === 'khang') {
         decoys.push({ x: player.x, y: player.y, lifeEnd: now + 6000 });
         playSfx(700, 'sine', 0.3);
-    } else if (selectedChar === 'dang') {
-        showRoad = true;
-        player.roadEnd = now + 5000;
-        playSfx(800, 'triangle', 0.4);
+    } else if (selectedChar === 'dang') { // parry skill
+        player.parryEnd = now + 2000;
+        player.isDelayed = true;
+        player.isParrying = true;
+        playSfx(1000, 'triangle', 0.4);
+        // parry logic
+        // stand still for 2 seconds, if a bot hits you during this time, you reflect it back, get invincible and stun the bot for 5 seconds
+        // if parry is successful, reduce the cooldown of I by half
+        // this is handled in the collision logic in the game loop
+        setTimeout(() => {
+            if (player.isParrying) {
+                player.isParrying = false;
+                player.isDelayed = false;
+                playSfx(300, 'sine', 0.3);
+            }
+        }, 2000);
     } else if (selectedChar === 'loi') {
         for (let i = 0; i < 2; i++) decoys.push({
             x: player.x + (Math.random() - 0.5),
@@ -369,11 +386,16 @@ function update() {
     // PLAYER MOVE
     let baseSpd = isHard ? 0.13 : 0.11;
     let mult = 1;
-    if (player.isDelayed) mult = 0;
+    if (player.isDelayed || player.isParrying) mult = 0;
+    else if (player.isParrySuccess) {
+        mult = 1.2;
+        player.isParrySuccess = false;
+        iCD = Math.max(iCD - COOLDOWNS[selectedChar].i / 2, now);
+    }
     else {
         if (player.isCoffee) mult *= 1.6;
         if (player.isMedalSpeed) mult *= 2.0;
-        if (player.isUlt) mult *= (selectedChar === 'dang' ? 3.0 : 1.5);
+        if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.5);
     }
     let pSpd = baseSpd * mult;
     if (pSpd > 0) {
@@ -396,7 +418,7 @@ function update() {
         else if (isCommonRage) finalBSpd *= 2.0;
 
         traps.forEach((t, idx) => {
-            if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
+            if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.5) {
                 b.delayUntil = now + 3000;
                 traps.splice(idx, 1);
                 spawnShockwave(t.x, t.y, '#fff');
@@ -418,13 +440,27 @@ function update() {
                 else { b.x = tx; b.y = ty; b.currentPath.shift(); }
             }
         }
-
+        // collision with player
         if (Math.sqrt((player.x - b.x) ** 2 + (player.y - b.y) ** 2) < 0.5) {
             if (player.isShield && now < player.shieldEnd) {
                 player.isShield = false;
                 b.delayUntil = now + 3000;
                 spawnShockwave(player.x, player.y, '#fbbf24');
-            } else if (!player.isGhost) {
+            } else if (player.isParrying && now < player.parryEnd) {
+                freezeEnd = now + 1000;
+                player.isInvincible = true;
+                player.isParrying = false;
+                player.isDelayed = false;
+                player.invincibleEnd = now + 2000;
+                player.isParrySuccess = true;
+                b.delayUntil = now + 3500;
+                spawnShockwave(player.x, player.y, '#ffffff');
+                bots.forEach(b => {
+                    b.superRageStart = now + 2500;
+                    b.superRageEnd = now + 5000;
+                });
+                playSfx(600, 'sawtooth', 0.2);
+            } else if (!player.isGhost && freezeEnd < now && (!player.isInvincible || now > player.invincibleEnd)) {
                 endGame(false);
             }
         }
@@ -459,6 +495,7 @@ function update() {
     if (now > player.ghostEnd) player.isGhost = false;
     if (now > player.coffeeEnd) player.isCoffee = false;
     if (now > player.shieldEnd) player.isShield = false;
+    if (now > player.invincibleEnd) player.isInvincible = false;
     if (now > player.medalSpeedEnd) player.isMedalSpeed = false;
     if (now > player.ultEnd) {
         if (player.isUlt && selectedChar === 'khang') document.getElementById('trap-counter').classList.add('hidden');
