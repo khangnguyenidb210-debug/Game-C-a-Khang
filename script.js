@@ -27,7 +27,7 @@ let alarmSoundPlaying = false;
 
 const COOLDOWNS = {
     khang: { y: 3000, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 10000, u: 8000, i: 14000, o: 20000 },
+    dang: { y: 15000, u: 8000, i: 14000, o: 20000 },
     loi: { y: 7000, u: 10000, i: 4000, o: 18000 }
 };
 
@@ -257,7 +257,7 @@ function useY() {
         playSfx(600, 'sine', 0.2);
     } else if (selectedChar === 'dang') {
         player.isCoffee = true;
-        player.coffeeEnd = now + 4000;
+        player.coffeeEnd = now + 5000;
         yCD = now + COOLDOWNS.dang.y;
         showRoad = true;
         player.roadEnd = now + 5000;
@@ -288,7 +288,7 @@ function useU() {
     } else if (selectedChar === 'dang') {
         bots.forEach(b => {
             let dx = b.x - player.x, dy = b.y - player.y, d = Math.sqrt(dx * dx + dy * dy);
-            if (d < 6) {
+            if (d < 5) {
                 b.x += (dx / d) * 3;
                 b.y += (dy / d) * 3;
                 b.delayUntil = now + 3000;
@@ -509,19 +509,17 @@ function update() {
                 b.delayUntil = now + 3000;
                 spawnShockwave(player.x, player.y, '#fbbf24');
             } else if (player.isParrying && now < player.parryEnd) {
-                freezeEnd = now + 1000;
                 player.isInvincible = true;
                 player.isParrying = false;
                 player.isDelayed = false;
                 player.invincibleEnd = now + 2000;
                 player.isParrySuccess = true;
-                b.delayUntil = now + 6000;
+                b.delayUntil = now + 3500;
                 spawnShockwave(player.x, player.y, '#ffffff');
-                bots.forEach(b => {
-                    b.superRageStart = now + 3000;
-                    b.superRageEnd = now + 6000;
-                });
                 playSfx(600, 'sawtooth', 0.2);
+                // rage after stunned
+                b.superRageStart = now + 3500;
+                b.superRageEnd = now + 8000;
             } else if (!player.isGhost && freezeEnd < now && (!player.isInvincible || now > player.invincibleEnd)) {
                 endGame(false, selectedBot);
             }
