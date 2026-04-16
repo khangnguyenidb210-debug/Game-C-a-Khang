@@ -27,10 +27,10 @@ let alarmSoundPlaying = false;
 
 const COOLDOWNS = {
     khang: { y: 3000, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 15000, u: 8000, i: 14000, o: 20000 },
+    dang: { y: 12000, u: 10000, i: 14000, o: 20000 },
     loi: { y: 7000, u: 10000, i: 4000, o: 18000 }
 };
-
+const delayLevels = { 1: 0, 2: 1250, 3: 2500 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
                 tin: "https://oj.vnoi.info/organization/cbl/problems", 
@@ -339,6 +339,7 @@ function useI() {
         player.isDelayed = true;
         player.isParrying = true;
         playSfx(1000, 'triangle', 0.4);
+        spawnShockwave(player.x, player.y, '#cecece');
     } else if (selectedChar === 'loi') {
         for (let i = 0; i < 2; i++) decoys.push({
             x: player.x + (Math.random() - 0.5),
@@ -411,7 +412,7 @@ function update() {
     const isCommonRage = elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
 
     // BOT Specialty Logic
-    if (selectedBot === 'quyen' && elapsed > 12500) {
+    if (selectedBot === 'quyen' && elapsed > 10000 + delayLevels[currentLevel]) {
         const delayLen = isHard ? 4500 : 3000;
         if (Math.floor(elapsed / 1000) % 10 === 0 && !player.isDelayed && now > player.delayEnd + 5000) {
             player.isDelayed = true;
@@ -472,6 +473,10 @@ function update() {
         if (keys.a && !checkCollision(player.x - pSpd, player.y)) player.x -= pSpd;
         if (keys.d && !checkCollision(player.x + pSpd, player.y)) player.x += pSpd;
     }
+    // give the player an aura when invincible
+    if (player.isInvincible) {
+        spawnTrail(player.x, player.y, 'rgba(255,255,255,0.5)');
+    }
     resolveWallStick();
 
     // BOT MOVE
@@ -515,16 +520,17 @@ function update() {
                 b.delayUntil = now + 3000;
                 spawnShockwave(player.x, player.y, '#fbbf24');
             } else if (player.isParrying && now < player.parryEnd) {
+                freezeEnd = now + 1500;
                 player.isInvincible = true;
                 player.isParrying = false;
                 player.isDelayed = false;
-                player.invincibleEnd = now + 2000;
+                player.invincibleEnd = now + 4500;
                 player.isParrySuccess = true;
-                b.delayUntil = now + 3500;
+                b.delayUntil = now + 4500;
                 spawnShockwave(player.x, player.y, '#ffffff');
                 playSfx(600, 'sawtooth', 0.2);
                 // rage after stunned
-                b.superRageStart = now + 3500;
+                b.superRageStart = now + 4500;
                 b.superRageEnd = now + 8000;
             } else if (!player.isGhost && freezeEnd < now && (!player.isInvincible || now > player.invincibleEnd)) {
                 endGame(false, selectedBot);
