@@ -109,7 +109,10 @@
     <div id="game-over" class="hidden absolute inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center text-center p-10">
         <h2 id="end-title" class="text-6xl font-black mb-4 text-red-600 italic uppercase">BỊ BẮT RỒI!</h2>
         <p id="end-subtitle" class="text-lg text-slate-300 mb-10 max-w-xl font-light">Từ đây đến hết kỳ nghỉ hè của bạn, phải giải tất cả bài tập tại <!-- LINK --></p>
-        <button onclick="location.reload()" class="bg-white text-black px-12 py-4 rounded-full text-xl font-bold hover:scale-110 transition-all uppercase">Chơi lại</button>
+        <div class="flex flex-col gap-4 sm:flex-row sm:justify-center">
+            <button onclick="returnToGame()" class="bg-white text-black px-12 py-4 rounded-full text-xl font-bold hover:scale-110 transition-all uppercase">Chơi lại</button>
+            <button onclick="returnToSelection()" class="bg-slate-800 text-white px-12 py-4 rounded-full text-xl font-bold hover:scale-110 transition-all uppercase">Trở về</button>
+        </div>
     </div>
 
     <script src="script.js"></script>
