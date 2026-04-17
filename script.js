@@ -28,7 +28,7 @@ let alarmSoundPlaying = false;
 const COOLDOWNS = {
     khang: { y: 3000, u: 10000, i: 5000, o: 15000 },
     dang: { y: 8000, u: 10000, i: 12000, o: 20000 },
-    loi: { y: 7000, u: 10000, i: 4000, o: 18000 }
+    loi: { y: 6000, u: 10000, i: 4000, o: 18000 }
 };
 const delayLevels = { 1: 0, 2: 1250, 3: 2500 };
 const keys = { w: false, a: false, s: false, d: false };
@@ -426,7 +426,6 @@ function update() {
     const rageCycle = 15000;
     const rageDuration = 5000;
     const isCommonRage = elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
-
     // BOT Specialty Logic
     if (selectedBot === 'quyen' && elapsed > 10000 + delayLevels[currentLevel]) {
         const delayLen = isHard ? 4500 : 3000;
@@ -441,24 +440,25 @@ function update() {
         player.isDelayed = false;
         document.getElementById('warning-flash').classList.remove('delay-warning');
     }
-
-    let isLuomSuperRage = false;
-    if (selectedBot === 'luom' && elapsed > 10000) {
-        const luomDur = isHard ? 5000 : 3000;
-        if ((elapsed % 20000) < luomDur) isLuomSuperRage = true;
+    let isLuomCanMove = false;
+    let tick = 1250 - currentLevel * 150 - (isCommonRage ? 30 * currentLevel : 0) - (isHard ? 25 * currentLevel : 0);
+    if (selectedBot === 'luom' && elapsed > tick) {
+        const luomDur = (isHard ? 110 : 90) + (isCommonRage ? 50 : 0);
+        if ((elapsed % tick) < luomDur)
+            isLuomCanMove = true;
     }
 
     const statusEl = document.getElementById('bot-status');
-    if (isCommonRage || isLuomSuperRage) {
+    if (isCommonRage) {
         statusEl.classList.remove('opacity-0');
-        statusEl.innerText = isLuomSuperRage ? "MR LƯỢM CỰC HẠN (3X SPEED!)" : "BOT PHẪN NỘ! (2X SPEED)";
+        statusEl.innerText = "BOT PHẪN NỘ! (2X SPEED)";
         playAlarm();
     } else { statusEl.classList.add('opacity-0'); }
 
     // SPAWN
-    const maxBots = isHard ? [5, 10, 20][currentLevel - 1] : [3, 5, 7][currentLevel - 1];
-    const spawnInterval = isHard ? 2500 : 4000;
-    if (elapsed > 2000 && (bots.length < maxBots) && (now - lastBotSpawnTime > spawnInterval)) {
+    const maxBots = (isHard ? [5, 12, 20][currentLevel - 1] : [3, 6, 9][currentLevel - 1]);
+    const spawnInterval = (isHard ? 2500 : 4000) - (selectedBot == 'luom' ? 1250 : 0);
+    if (elapsed > 2000 - (selectedBot == 'luom' ? 1250 : 0) && (bots.length < maxBots) && (now - lastBotSpawnTime > spawnInterval)) {
         bots.push({
             x: 1.5, y: 1.5, delayUntil: now + 500, nextPathUpdate: 0,
             currentPath: [], rageUntil: 0,
@@ -473,14 +473,14 @@ function update() {
     let mult = 1;
     if (player.isDelayed || player.isParrying) mult = 0;
     else if (player.isParrySuccess) {
-        mult = 1.4;
+        mult = 1.35;
         player.isParrySuccess = false;
         iCD = Math.max(iCD - COOLDOWNS[selectedChar].i / 2, now);
     }
     else {
         if (player.isCoffee) mult *= 1.5;
         if (player.isMedalSpeed) mult *= 2.0;
-        if (player.isUlt) mult *= (selectedChar === 'dang' ? 3 : 1.6);
+        if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.8 : 1.6);
     }
     let pSpd = baseSpd * mult;
     if (pSpd > 0) {
@@ -498,19 +498,25 @@ function update() {
     // BOT MOVE
     let bSpdBase = (isHard ? 0.09 : 0.05) + (currentLevel * 0.015);
     if (selectedBot === 'tin') bSpdBase *= (isHard ? 2.0 : 1.75);
+    if (selectedBot === 'luom') bSpdBase = (isLuomCanMove ? (isHard ? 1.35 : 1.2) : 0);
     if (selectedBot === 'quyen' && isHard) bSpdBase *= 1.5;
 
     bots.forEach(b => {
-        const superEnraged = (now > b.superRageStart && now < b.superRageEnd) || isLuomSuperRage;
+        const superEnraged = (now > b.superRageStart && now < b.superRageEnd);
         let finalBSpd = bSpdBase;
         if (superEnraged) finalBSpd *= 3.0;
         else if (isCommonRage) finalBSpd *= 2.0;
 
         traps.forEach((t, idx) => {
             if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.5) {
-                b.delayUntil = now + 3000;
+                let delayTime = (isHard ? 2000 : 3000);
+                b.delayUntil = now + delayTime;
                 traps.splice(idx, 1);
                 spawnShockwave(t.x, t.y, '#fff');
+                if (selectedBot == 'luom') {
+                    b.superRageStart = now + delayTime;
+                    b.superRageEnd = now + delayTime + 7000;
+                }
                 playSfx(200, 'sine', 0.2);
             }
         });
@@ -603,7 +609,7 @@ function update() {
     decoys = decoys.filter(d => now < d.lifeEnd);
 
     updateUI(now);
-    draw(isCommonRage || isLuomSuperRage);
+    draw(isCommonRage);
     requestAnimationFrame(update);
 }
 
@@ -748,6 +754,7 @@ function endGame(win, bot) {
     } else {
         // replace the link based on the bot, change link color and make the link hyperlink
         document.getElementById('end-title').innerText = "BỊ BẮT RỒI!";
+        document.getElementById('end-title').style.color = "red";
         document.getElementById('end-subtitle').innerText = "Từ đây đến hết kỳ nghỉ hè của bạn, phải giải tất cả bài tập tại ";
         const linkElement = document.createElement('a');
         linkElement.href = links[bot];

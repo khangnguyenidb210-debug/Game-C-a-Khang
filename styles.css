@@ -55,12 +55,15 @@ body {
 @keyframes glitch {
     2%, 64% {
         transform: translate(2px, 0) skew(0deg);
+        color: #dcdfe4;
     }
     4%, 60% {
         transform: translate(-2px, 0) skew(0deg);
+        color: #e2e2e2;
     }
     62% {
         transform: translate(0, 0) skew(5deg);
+        color: #fff;
     }
 }
 
