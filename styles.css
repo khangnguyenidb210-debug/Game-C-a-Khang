@@ -1,0 +1,136 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;700&display=swap');
+
+body {
+    margin: 0;
+    background-color: #020617;
+    color: #f8fafc;
+    font-family: 'Space Grotesk', sans-serif;
+    overflow: hidden;
+    touch-action: none;
+}
+
+#game-canvas {
+    display: block;
+    margin: 0 auto;
+    background: radial-gradient(circle, #0f172a 0%, #020617 100%);
+    border: 4px solid #334155;
+    border-radius: 12px;
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(255, 255, 255, 0.05);
+}
+
+#pause-overlay {
+    pointer-events: none;
+}
+
+#pause-overlay > div {
+    max-width: 90%;
+}
+
+.skill-slot {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 2px solid #334155;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.cd-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(34, 197, 94, 0.4);
+    transition: height 0.1s linear;
+}
+
+.glitch {
+    animation: glitch 1s linear infinite;
+}
+
+@keyframes glitch {
+    2%, 64% {
+        transform: translate(2px, 0) skew(0deg);
+        color: #dcdfe4;
+    }
+    4%, 60% {
+        transform: translate(-2px, 0) skew(0deg);
+        color: #e2e2e2;
+    }
+    62% {
+        transform: translate(0, 0) skew(5deg);
+        color: #fff;
+    }
+}
+
+.skill-text {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    line-height: 1.2;
+}
+
+.mode-btn,
+.bot-btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mode-btn:hover,
+.bot-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px -5px rgba(255, 255, 255, 0.1);
+}
+
+.selected-box {
+    border-color: #22c55e !important;
+    background: rgba(34, 197, 94, 0.1) !important;
+    color: white !important;
+}
+
+.enraged-warning {
+    animation: pulse-red 0.5s infinite alternate;
+}
+
+@keyframes pulse-red {
+    from {
+        color: #f8fafc;
+        text-shadow: 0 0 0px red;
+    }
+    to {
+        color: #ef4444;
+        text-shadow: 0 0 15px red;
+    }
+}
+
+.delay-warning {
+    animation: pulse-yellow 0.3s infinite alternate;
+}
+
+@keyframes pulse-yellow {
+    from {
+        background: transparent;
+    }
+    to {
+        background: rgba(234, 179, 8, 0.3);
+    }
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #020617;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+}
