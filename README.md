@@ -5,6 +5,7 @@ Tựa game ban đầu được viết với C++ của Khang và được chuyể
 
 # **Lưu ý**
 Game được thiết kế cho PC/Laptop, không phù hợp với điện thoại và các thiết bị khác tương tự!
+
 Game chỉ mang tính chất giải trí và không có mục đích xúc phạm cá nhân hay tổ chức nào khác, xin cảm ơn.
 
 # **Cài đặt**
@@ -13,8 +14,8 @@ hoặc có thể thử trực tiếp tại [đây](https://khangnguyenidb210-deb
 
 # **Cách chơi**
 Trốn thoát khỏi mê cung trước khi giáo viên bắt được bạn, dùng các kĩ năng có sẵn để sống sót!
-Di chuyển: W-A-S-D (trên, trái, dưới, phải)
-Kĩ năng: Y-U-I-O (chiêu 1/2/3, util)
+- Di chuyển: W-A-S-D (trên, trái, dưới, phải)
+- Kĩ năng: Y-U-I-O (chiêu 1/2/3, ulti)
 
 # **Gameplay**
 ![gameplay1](https://github.com/khangnguyenidb210-debug/Game-C-a-Khang/blob/main/assets/previews/gameplay1.png)
