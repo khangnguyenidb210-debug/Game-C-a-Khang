@@ -27,10 +27,9 @@ let alarmSoundPlaying = false;
 
 const COOLDOWNS = {
     khang: { y: 3000, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 8000, u: 10000, i: 12000, o: 20000 },
+    dang: { y: 7000, u: 10000, i: 12000, o: 20000 },
     loi: { y: 6000, u: 10000, i: 4000, o: 18000 }
 };
-const delayLevels = { 1: 0, 2: 1250, 3: 2500 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
                 tin: "https://oj.vnoi.info/organization/cbl/problems", 
@@ -257,10 +256,10 @@ function useY() {
         playSfx(600, 'sine', 0.2);
     } else if (selectedChar === 'dang') {
         player.isCoffee = true;
-        player.coffeeEnd = now + 5000;
+        player.coffeeEnd = now + 4000;
         yCD = now + COOLDOWNS.dang.y;
         showRoad = true;
-        player.roadEnd = now + 5000;
+        player.roadEnd = now + 4000;
         playSfx(800, 'triangle', 0.4);
     } else if (selectedChar === 'loi') {
         let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
@@ -344,7 +343,6 @@ function useI() {
         playSfx(700, 'sine', 0.3);
     } else if (selectedChar === 'dang') { // parry skill
         player.parryEnd = now + 1500;
-        player.isDelayed = true;
         player.isParrying = true;
         playSfx(1000, 'triangle', 0.4);
         spawnShockwave(player.x, player.y, '#cecece');
@@ -427,23 +425,23 @@ function update() {
     const rageDuration = 5000;
     const isCommonRage = elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
     // BOT Specialty Logic
-    if (selectedBot === 'quyen' && elapsed > 10000 + delayLevels[currentLevel]) {
-        const delayLen = isHard ? 4500 : 3000;
-        if (Math.floor(elapsed / 1000) % 10 === 0 && !player.isDelayed && now > player.delayEnd + 5000) {
-            player.isDelayed = true;
-            player.delayEnd = now + delayLen;
-            document.getElementById('warning-flash').classList.add('delay-warning');
-            playSfx(120, 'square', 0.5, 0.3);
-        }
+    // Queen delays the player for 3 seconds (4.5 seconds on hard mode) every 10 seconds, with longer delay on hard mode
+    if (selectedBot === 'quyen' && !player.isDelayed && elapsed > 5000 && (elapsed % (10000 + 1250 * (currentLevel-1))) < 50) {
+        player.isDelayed = true;
+        player.delayEnd = now + (isHard ? 4500 : 3000);
+        document.getElementById('warning-flash').classList.add('delay-warning');
+        playSfx(450, 'square', 0.5);
     }
+
     if (now > player.delayEnd) {
         player.isDelayed = false;
         document.getElementById('warning-flash').classList.remove('delay-warning');
     }
+
     let isLuomCanMove = false;
-    let tick = 1250 - currentLevel * 150 - (isCommonRage ? 30 * currentLevel : 0) - (isHard ? 25 * currentLevel : 0);
+    let tick = 450 - currentLevel * 45 - (isCommonRage ? 12 * currentLevel : 0) - (isHard ? 7 * currentLevel : 4 * currentLevel);
     if (selectedBot === 'luom' && elapsed > tick) {
-        const luomDur = (isHard ? 110 : 90) + (isCommonRage ? 50 : 0);
+        const luomDur = (isHard ? 45 : 30) + (isCommonRage ? (isHard ? 12.5 : 7) * currentLevel : 0);
         if ((elapsed % tick) < luomDur)
             isLuomCanMove = true;
     }
@@ -469,7 +467,7 @@ function update() {
     }
 
     // PLAYER MOVE
-    let baseSpd = isHard ? 0.13 : 0.11;
+    let baseSpd = isHard ? 0.1275 : 0.11;
     let mult = 1;
     if (player.isDelayed || player.isParrying) mult = 0;
     else if (player.isParrySuccess) {
@@ -498,7 +496,7 @@ function update() {
     // BOT MOVE
     let bSpdBase = (isHard ? 0.09 : 0.05) + (currentLevel * 0.015);
     if (selectedBot === 'tin') bSpdBase *= (isHard ? 2.0 : 1.75);
-    if (selectedBot === 'luom') bSpdBase = (isLuomCanMove ? (isHard ? 1.35 : 1.2) : 0);
+    if (selectedBot === 'luom') bSpdBase = (isLuomCanMove ? (isHard ? 1.25 : 1.1) : 0);
     if (selectedBot === 'quyen' && isHard) bSpdBase *= 1.5;
 
     bots.forEach(b => {
@@ -508,7 +506,7 @@ function update() {
         else if (isCommonRage) finalBSpd *= 2.0;
 
         traps.forEach((t, idx) => {
-            if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.5) {
+            if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
                 let delayTime = (isHard ? 2000 : 3000);
                 b.delayUntil = now + delayTime;
                 traps.splice(idx, 1);
@@ -542,18 +540,17 @@ function update() {
                 b.delayUntil = now + 3000;
                 spawnShockwave(player.x, player.y, '#fbbf24');
             } else if (player.isParrying && now < player.parryEnd) {
-                freezeEnd = now + 2500;
+                freezeEnd = now + 2000;
                 player.isInvincible = true;
                 player.isParrying = false;
-                player.isDelayed = false;
-                player.invincibleEnd = now + 4500;
+                player.invincibleEnd = now + 3000;
                 player.isParrySuccess = true;
-                b.delayUntil = now + 5000;
+                b.delayUntil = now + 3500;
                 spawnShockwave(player.x, player.y, '#ffffff');
                 playSfx(600, 'sawtooth', 0.2);
                 // rage after stunned
-                b.superRageStart = now + 5000;
-                b.superRageEnd = now + 8000;
+                b.superRageStart = now + 3500;
+                b.superRageEnd = now + 7000;
             } else if (!player.isGhost && freezeEnd < now && (!player.isInvincible || now > player.invincibleEnd)) {
                 endGame(false, selectedBot);
             }
@@ -575,7 +572,7 @@ function update() {
             player.y = 1.5;
             playSfx(500, 'sine', 0.5, 0.2, 1200);
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
-        } else endGame(true);
+        } else endGame(true, selectedBot);
     }
 
     // CLEANUP
@@ -587,13 +584,10 @@ function update() {
     if (shakeAmount > 0) shakeAmount *= 0.92;
 
     if (now > freezeEnd) freezeEnd = 0;
+    if (now > player.parryEnd) player.isParrying = false;
     if (now > player.ghostEnd) player.isGhost = false;
     if (now > player.coffeeEnd) player.isCoffee = false;
     if (now > player.shieldEnd) player.isShield = false;
-    if (now > player.parryEnd) {
-        player.isParrying = false;
-        player.isDelayed = false;
-    }
     if (now > player.invincibleEnd) player.isInvincible = false;
     if (now > player.medalSpeedEnd) player.isMedalSpeed = false;
     if (now > player.ultEnd) {
@@ -715,7 +709,7 @@ function draw(inRage) {
     if (player.isUlt && selectedChar === 'dang') pCol = '#fbbf24';
     if (player.isDelayed) pCol = '#475569';
     if (player.isGhost && selectedChar === 'dang') pCol = 'rgba(6, 182, 212, 0.5)';
-    drawEntity(player.x, player.y, pCol, (player.isGhost || player.isDelayed) ? 'transparent' : '#000');
+    drawEntity(player.x, player.y, pCol, (player.isGhost || player.isDelayed) ? 'transparent' : '#454545');
 
     bots.forEach(b => {
         const now = Date.now();
