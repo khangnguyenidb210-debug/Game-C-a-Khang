@@ -3,6 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
+const version = "1.0.0";
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
@@ -15,20 +16,21 @@ let player = {
     isDelayed: false, delayEnd: 0,
     isParrying: false, parryEnd: 0,
     isInvincible: false, invincibleEnd: 0,
-    isParrySuccess: false
+    isParrySuccess: false, isKilling: false
 };
 
 let bots = [], particles = [], decoys = [], trails = [], shockwaves = [], traps = [];
 let gameActive = false, gamePaused = false, pauseStart = 0, startTime = 0, selectedChar = 'khang', gameMode = 'normal', currentLevel = 1;
 let selectedBot = 'quyen';
+let popupEnd = 0;
 let yCD = 0, uCD = 0, iCD = 0, oCD = 0, freezeEnd = 0, lastBotSpawnTime = 0;
 let shakeAmount = 0, showRoad = false;
 let alarmSoundPlaying = false;
 
 const COOLDOWNS = {
-    khang: { y: 3000, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 7000, u: 10000, i: 12000, o: 20000 },
-    loi: { y: 6000, u: 10000, i: 4000, o: 18000 }
+    khang: { y: 4500, u: 10000, i: 4500, o: 15000 },
+    dang: { y: 7000, u: 10000, i: 12000, o: 18000 },
+    loi: { y: 6000, u: 10000, i: 5000, o: 18000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -119,6 +121,13 @@ function playSfx(f, t, d, v = 0.1, s = 0) {
     } catch (e) { }
 }
 
+function playSound(url, vol = 1.0) {
+    const audio = new Audio(url);
+    audio.style.display = "none";
+    audio.volume = vol;
+    audio.play().catch(error => console.log("Playback blocked:", error));
+}   
+
 // Cảnh báo phẫn nộ
 function playAlarm() {
     if (alarmSoundPlaying) return;
@@ -167,7 +176,7 @@ function checkCollision(x, y, ignoreWalls = false) {
     for (let i = t; i <= b; i++) {
         for (let j = l; j <= r; j++) {
             if (i < 0 || i >= ROWS || j < 0 || j >= COLS) return true;
-            if (!ignoreWalls && maze[i][j] === '#') return true;
+            if (!ignoreWalls && (maze[i][j] === '#' || maze[i][j] === 'a')) return true;
         }
     }
     return false;
@@ -220,7 +229,7 @@ function getPath(sx, sy, tx, ty) {
         }
         for (let [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
             let nx = cx + dx, ny = cy + dy, k = `${nx},${ny}`;
-            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && maze[ny][nx] !== '#' && !v.has(k)) {
+            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && maze[ny][nx] !== '#' && maze[ny][nx] !== 'a' && !v.has(k)) {
                 v.add(k);
                 p[k] = `${cx},${cy}`;
                 q.push([nx, ny]);
@@ -277,20 +286,22 @@ function useY() {
 }
 
 function useU() {
-    if (Date.now() < uCD || player.isDelayed) return;
     const now = Date.now();
+    if (now < uCD || player.isDelayed) return;
     shakeAmount = 10;
     if (selectedChar === 'khang') {
         freezeEnd = now + 4000;
         spawnShockwave(player.x, player.y, 'rgba(255,255,255,0.5)');
         playSfx(300, 'square', 0.4);
     } else if (selectedChar === 'dang') {
+        let isPunchSuccess = false;
         bots.forEach(b => {
             let dx = b.x - player.x, dy = b.y - player.y, d = Math.sqrt(dx * dx + dy * dy);
             if (d < 5) {
                 b.x += (dx / d) * 4;
                 b.y += (dy / d) * 4;
                 b.delayUntil = now + 3000;
+                isPunchSuccess = true;
             }
         });
         bots.forEach(b => {
@@ -307,8 +318,21 @@ function useU() {
                 }
             }
         });
-        spawnShockwave(player.x, player.y, 'rgba(6,182,212,0.8)');
-        playSfx(200, 'sine', 0.5, 0.2, 50);
+        if (selectedBot === 'anh') {
+            let dir = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+            for (let i = 0; i < 8; i++) {
+                let nx = Math.floor(player.x) + dir[i][0], ny = Math.floor(player.y) + dir[i][1];
+                if (nx > 0 && nx < COLS-1 && ny > 0 && ny < ROWS-1 && maze[ny][nx] === 'a') {
+                    maze[ny][nx] = '.';
+                    isPunchSuccess = true;
+                }
+            }
+        }
+        if (isPunchSuccess) {
+            spawnShockwave(player.x, player.y, 'rgba(16, 219, 255, 0.8)');
+            playSound('assets/punchsucess.mp3', 0.7);
+        } else playSound('assets/doh-i-missed.mp3', 0.75)
+
     } else if (selectedChar === 'loi') {
         freezeEnd = now + 3000;
         player.isShield = true;
@@ -341,7 +365,7 @@ function useI() {
     if (selectedChar === 'khang') {
         decoys.push({ x: player.x, y: player.y, lifeEnd: now + 6000 });
         playSfx(700, 'sine', 0.3);
-    } else if (selectedChar === 'dang') { // parry skill
+    } else if (selectedChar === 'dang') {
         player.parryEnd = now + 1500;
         player.isParrying = true;
         playSfx(1000, 'triangle', 0.4);
@@ -362,7 +386,6 @@ function useO() {
     if (now < oCD || player.isDelayed) return;
     shakeAmount = 40;
     if (selectedChar === 'dang') {
-        // ĐĂNG ULT: 3x Speed, Xuyên Bot
         player.isUlt = true;
         player.isGhost = true;
         player.ultEnd = now + 3000;
@@ -414,51 +437,74 @@ function useO() {
 /**
  * GAME LOOP
  */
+
 function update() {
     if (!gameActive) return;
     const now = Date.now();
     const elapsed = now - startTime;
     const isHard = gameMode === 'hard';
-
+    const isRageable = (selectedBot != 'anh');
     // BOT STATES
-    const rageCycle = 15000;
+    const rageCycle = 15000 - (selectedBot === 'luom' ? 5000 : 0) - (isHard ? 1250 * currentLevel : 0);
     const rageDuration = 5000;
     const isCommonRage = elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
     // BOT Specialty Logic
     // Queen delays the player for 3 seconds (4.5 seconds on hard mode) every 10 seconds, with longer delay on hard mode
-    if (selectedBot === 'quyen' && !player.isDelayed && elapsed > 5000 && (elapsed % (10000 + 1250 * (currentLevel-1))) < 50) {
+    if (selectedBot === 'quyen' && !player.isDelayed && elapsed > 5000 && (elapsed % (10000 + 1750 * (currentLevel - 1))) < 50 && freezeEnd < now) {
         player.isDelayed = true;
         player.delayEnd = now + (isHard ? 4500 : 3000);
         document.getElementById('warning-flash').classList.add('delay-warning');
         playSfx(450, 'square', 0.5);
     }
-
-    if (now > player.delayEnd) {
-        player.isDelayed = false;
-        document.getElementById('warning-flash').classList.remove('delay-warning');
+    // Anh create a wall in empty spaces thats blocks the shortest path from player to the exit in the map every 10 seconds that lasts based on difficulty
+    // Make sure the wall doesn't spawn on top of the player and that the bots can still pathfind to the player after the wall is spawned (to avoid softlock)
+    // And make sure the wall doesn't spawn too close to the player or the exit (within 1.5 tiles) to avoid unfair situations
+    if (selectedBot === 'anh' && 
+        elapsed > (10000 + (isHard ? 500 : 800) * (currentLevel - 1)) && 
+        (elapsed % (10000 + (isHard ? 500 : 800) * (currentLevel - 1))) < 50 && freezeEnd < now) {
+        let path = getPath(player.x, player.y, COLS - 1.5, ROWS - 1.5);
+        if (path.length > 2) {
+            for (let i = path.length - 2; i > 0; i--) {
+                let [wx, wy] = path[i];
+                if (maze[wy][wx] !== 'k' && maze[wy][wx] !== 'a' && maze[wy][wx] !== 'w' 
+                    && Math.sqrt((wx + 0.5 - player.x) ** 2 + (wy + 0.5 - player.y) ** 2) > 1.5 && Math.sqrt((wx + 0.5 - (COLS - 1.5)) ** 2 + (wy + 0.5 - (ROWS - 1.5)) ** 2) > 1.5) {
+                    maze[wy][wx] = 'a';
+                    setTimeout(() => {
+                        maze[wy][wx] = '.';
+                    }, (isHard ? 7500 : 6000) + (500 * (currentLevel - 1)));
+                    spawnShockwave(wx + 0.5, wy + 0.5, '#ef4444');
+                    playSound('assets/placingwall.mp3');
+                    break;
+                }
+            }
+        }
     }
-
+    // Lerm movement
     let isLuomCanMove = false;
-    let tick = 450 - currentLevel * 45 - (isCommonRage ? 12 * currentLevel : 0) - (isHard ? 7 * currentLevel : 4 * currentLevel);
+    let tick = 500 - currentLevel * 45 - (isCommonRage ? 12 * currentLevel : 0) - (isHard ? 6 * currentLevel : 4 * currentLevel);
     if (selectedBot === 'luom' && elapsed > tick) {
-        const luomDur = (isHard ? 45 : 30) + (isCommonRage ? (isHard ? 12.5 : 7) * currentLevel : 0);
-        if ((elapsed % tick) < luomDur)
+        const luomDur = (isHard ? 75 : 50) + (isCommonRage ? (isHard ? 12.5 : 7) * currentLevel : 0);
+        if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0)
             isLuomCanMove = true;
+    }
+    // Make step noise when Luom is moving
+    if (isLuomCanMove) {
+        playSound('assets/ruler-slap.mp3', 0.7);
     }
 
     const statusEl = document.getElementById('bot-status');
-    if (isCommonRage) {
+    if (isCommonRage && isRageable) {
         statusEl.classList.remove('opacity-0');
         statusEl.innerText = "BOT PHẪN NỘ! (2X SPEED)";
         playAlarm();
-    } else { statusEl.classList.add('opacity-0'); }
+    } else statusEl.classList.add('opacity-0');
 
     // SPAWN
     const maxBots = (isHard ? [5, 12, 20][currentLevel - 1] : [3, 6, 9][currentLevel - 1]);
     const spawnInterval = (isHard ? 2500 : 4000) - (selectedBot == 'luom' ? 1250 : 0);
     if (elapsed > 2000 - (selectedBot == 'luom' ? 1250 : 0) && (bots.length < maxBots) && (now - lastBotSpawnTime > spawnInterval)) {
         bots.push({
-            x: 1.5, y: 1.5, delayUntil: now + 500, nextPathUpdate: 0,
+            x: 1.5, y: 1.5, delayUntil: now + 500 + (selectedBot == 'luom' ? 250 : 0), nextPathUpdate: 0,
             currentPath: [], rageUntil: 0,
             superRageStart: 0, superRageEnd: 0
         });
@@ -467,18 +513,18 @@ function update() {
     }
 
     // PLAYER MOVE
-    let baseSpd = isHard ? 0.1275 : 0.11;
+    let baseSpd = isHard ? 0.1265 : 0.085;
     let mult = 1;
     if (player.isDelayed || player.isParrying) mult = 0;
     else if (player.isParrySuccess) {
-        mult = 1.35;
+        mult = 1.3;
         player.isParrySuccess = false;
         iCD = Math.max(iCD - COOLDOWNS[selectedChar].i / 2, now);
     }
     else {
         if (player.isCoffee) mult *= 1.5;
         if (player.isMedalSpeed) mult *= 2.0;
-        if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.8 : 1.6);
+        if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.6);
     }
     let pSpd = baseSpd * mult;
     if (pSpd > 0) {
@@ -487,28 +533,49 @@ function update() {
         if (keys.a && !checkCollision(player.x - pSpd, player.y)) player.x -= pSpd;
         if (keys.d && !checkCollision(player.x + pSpd, player.y)) player.x += pSpd;
     }
-    // give the player an aura when invincible
     if (player.isInvincible) {
         spawnTrail(player.x, player.y, 'rgba(255,255,255,0.5)');
     }
     resolveWallStick();
 
     // BOT MOVE
-    let bSpdBase = (isHard ? 0.09 : 0.05) + (currentLevel * 0.015);
+    let bSpdBase = (isHard ? 0.09 : 0.065) + (currentLevel * 0.015);
     if (selectedBot === 'tin') bSpdBase *= (isHard ? 2.0 : 1.75);
     if (selectedBot === 'luom') bSpdBase = (isLuomCanMove ? (isHard ? 1.25 : 1.1) : 0);
-    if (selectedBot === 'quyen' && isHard) bSpdBase *= 1.5;
-
+    if ((selectedBot === 'quyen' || selectedBot === 'anh') && isHard) bSpdBase *= 1.5;
     bots.forEach(b => {
+        if (b.x <= 0 || b.x > COLS - 1 || b.y <= 0 || b.y > ROWS - 1) {
+            bots.splice(bots.indexOf(b), 1);
+            // popup you just eliminated a bot + sfx
+            const popup = document.getElementById('popup-notification');
+            popup.color = '#a90808';
+            popup.innerText = "Bạn hạ gục được 1 bot!";
+            popup.classList.remove('hidden');
+            popupEnd = now + 1500;
+            let killsfx = new Audio('assets/kill.mp3');
+            killsfx.play();
+            playSfx(200, 'sine', 0.2);
+            // reduce player cooldowns by 1/3
+            yCD = Math.max(yCD - COOLDOWNS[selectedChar].y / 3, now);
+            uCD = Math.max(uCD - COOLDOWNS[selectedChar].u / 3, now);
+            iCD = Math.max(iCD - COOLDOWNS[selectedChar].i / 3, now);
+            oCD = Math.max(oCD - COOLDOWNS[selectedChar].o / 3, now);
+            return;
+        }
         const superEnraged = (now > b.superRageStart && now < b.superRageEnd);
         let finalBSpd = bSpdBase;
-        if (superEnraged) finalBSpd *= 3.0;
-        else if (isCommonRage) finalBSpd *= 2.0;
-
+        if (superEnraged && isRageable) finalBSpd *= (selectedBot === 'luom' ? 3.25 : 3.0);
+        else if (isCommonRage && isRageable) finalBSpd *= 2.0;
+        if (isLuomCanMove){
+            spawnTrail(b.x, b.y, '#ef4444');
+        };
         traps.forEach((t, idx) => {
             if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
-                let delayTime = (isHard ? 2000 : 3000);
-                b.delayUntil = now + delayTime;
+                b.delayUntil = now + (isHard ? 2500 : 3500);
+                const popup = document.getElementById('popup-notification');
+                popup.color = '#449fef';
+                popup.innerText = "Bạn bẫy được 1 bot!";
+                popup.classList.remove('hidden');
                 traps.splice(idx, 1);
                 spawnShockwave(t.x, t.y, '#fff');
                 if (selectedBot == 'luom') {
@@ -537,7 +604,7 @@ function update() {
         if (Math.sqrt((player.x - b.x) ** 2 + (player.y - b.y) ** 2) < 0.5) {
             if (player.isShield && now < player.shieldEnd) {
                 player.isShield = false;
-                b.delayUntil = now + 3000;
+                b.delayUntil = now + (isHard ? 2500 : 3500);
                 spawnShockwave(player.x, player.y, '#fbbf24');
             } else if (player.isParrying && now < player.parryEnd) {
                 freezeEnd = now + 2000;
@@ -545,14 +612,36 @@ function update() {
                 player.isParrying = false;
                 player.invincibleEnd = now + 3000;
                 player.isParrySuccess = true;
-                b.delayUntil = now + 3500;
+                b.delayUntil = now + 4000;
+                // explosion effect + sfx
+                playSfx(200, 'sine', 0.2);
+                spawnShockwave(player.x, player.y, '#ff0000');
+                spawnShockwave(player.x, player.y, '#ffa653');
                 spawnShockwave(player.x, player.y, '#ffffff');
-                playSfx(600, 'sawtooth', 0.2);
                 // rage after stunned
-                b.superRageStart = now + 3500;
-                b.superRageEnd = now + 7000;
+                if (selectedBot !== 'anh') {
+                    b.superEnraged = true;
+                    b.superRageStart = now + 3500;
+                    b.superRageEnd = now + 7000;
+                    playSound('assets/rahhh.mp3')
+                }
+                // show parry picture + ease-out + sfx in assets
+                const parry = document.getElementById('parry');
+                parry.classList.remove('hidden');
+                parry.style.opacity = 1;
+                setTimeout(() => {
+                    parry.style.transition = 'opacity 0.8s ease-out';
+                    parry.style.opacity = 0;
+                }, 200);
+                setTimeout(() => {
+                    parry.classList.add('hidden');
+                    parry.style.transition = 'none';
+                }, 600);
+                // play custom parry sfx in assets
+                playSound('assets/parry.mp3');
             } else if (!player.isGhost && freezeEnd < now && (!player.isInvincible || now > player.invincibleEnd)) {
                 endGame(false, selectedBot);
+                playSound('assets/kill.mp3');
             }
         }
     });
@@ -572,7 +661,10 @@ function update() {
             player.y = 1.5;
             playSfx(500, 'sine', 0.5, 0.2, 1200);
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
-        } else endGame(true, selectedBot);
+        } else {
+            endGame(true, selectedBot);
+            playSound('assets/winning.mp3');
+        }
     }
 
     // CLEANUP
@@ -590,11 +682,19 @@ function update() {
     if (now > player.shieldEnd) player.isShield = false;
     if (now > player.invincibleEnd) player.isInvincible = false;
     if (now > player.medalSpeedEnd) player.isMedalSpeed = false;
+    if (now > player.delayEnd) {
+        player.isDelayed = false;
+        document.getElementById('warning-flash').classList.remove('delay-warning');
+    }
     if (now > player.ultEnd) {
-        if (player.isUlt && selectedChar === 'khang') document.getElementById('trap-counter').classList.add('hidden');
+        if (player.isUlt && selectedChar === 'khang') 
+            document.getElementById('trap-counter').classList.add('hidden');
         player.isUlt = false;
     }
     if (now > player.roadEnd) showRoad = false;
+
+    if (now > popupEnd)
+        document.getElementById('popup-notification').classList.add('hidden');
 
     if (player.isUlt) {
         let color = selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'khang' ? '#fff' : '#6366f1');
@@ -603,14 +703,14 @@ function update() {
     decoys = decoys.filter(d => now < d.lifeEnd);
 
     updateUI(now);
-    draw(isCommonRage);
+    draw(isCommonRage && isRageable);
     requestAnimationFrame(update);
 }
 
 /**
  * RENDER
  */
-function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false, isSuperEnraged = false) {
+function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false) {
     const size = (isBot ? 0.75 : 0.6) * TILE_SIZE;
     if (!isBot && player.isShield && Date.now() < player.shieldEnd) {
         ctx.strokeStyle = '#fbbf24';
@@ -620,12 +720,7 @@ function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false, isS
         ctx.strokeRect(x * TILE_SIZE - size * 0.8, y * TILE_SIZE - size * 0.8, size * 1.6, size * 1.6);
         ctx.shadowBlur = 0;
     }
-    if (isBot && isSuperEnraged) {
-        ctx.fillStyle = '#ff0000';
-        ctx.shadowBlur = 35;
-        ctx.shadowColor = '#ff0000';
-    }
-    else if (isBot && isEnraged) {
+    if (isBot && isEnraged) {
         ctx.fillStyle = '#f97316';
         ctx.shadowBlur = 25;
         ctx.shadowColor = '#f97316';
@@ -638,7 +733,7 @@ function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false, isS
 
     ctx.fillRect(x * TILE_SIZE - size / 2, y * TILE_SIZE - size / 2, size, size);
     ctx.shadowBlur = 0;
-    ctx.fillStyle = (isBot && (isEnraged || isSuperEnraged)) ? '#fff' : eyeColor;
+    ctx.fillStyle = (isBot && isEnraged) ? '#fff' : eyeColor;
     ctx.fillRect(x * TILE_SIZE - size * 0.25, y * TILE_SIZE - size * 0.2, size * 0.2, size * 0.2);
     ctx.fillRect(x * TILE_SIZE + size * 0.05, y * TILE_SIZE - size * 0.2, size * 0.2, size * 0.2);
 }
@@ -652,8 +747,14 @@ function draw(inRage) {
         for (let c = 0; c < COLS; c++) {
             if (maze[r][c] === '#') {
                 let grad = ctx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
-                grad.addColorStop(0, inRage ? '#450a0a' : '#1e293b');
+                grad.addColorStop(0, inRage ? '#450a0a' : '#222c3c');
                 grad.addColorStop(1, '#020617');
+                ctx.fillStyle = grad;
+                ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            } else if (maze[r][c] === 'a') {
+                let grad = ctx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
+                grad.addColorStop(0, '#ffae00');
+                grad.addColorStop(1, '#b6ae25');
                 ctx.fillStyle = grad;
                 ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
             } else if (maze[r][c] === 'K') {
@@ -688,6 +789,8 @@ function draw(inRage) {
         });
         ctx.stroke();
         ctx.setLineDash([]);
+    } else {
+        yCD = Math.max(0, yCD / 2);
     }
 
     trails.forEach(t => {
@@ -714,7 +817,7 @@ function draw(inRage) {
     bots.forEach(b => {
         const now = Date.now();
         const superEnraged = (now > b.superRageStart && now < b.superRageEnd) || (selectedBot === 'luom' && ((now - startTime) % 20000 < (gameMode === 'hard' ? 5000 : 3000)) && (now - startTime > 20000));
-        let bCol = (selectedBot === 'quyen' ? '#ec4899' : (selectedBot === 'tin' ? '#3b82f6' : '#ef4444'));
+        let bCol = (selectedBot === 'anh' ? '#f59e0b' : (selectedBot === 'quyen' ? '#ec4899' : (selectedBot === 'tin' ? '#3b82f6' : '#ef4444')));
         if (now < freezeEnd) bCol = '#fff';
         drawEntity(b.x, b.y, bCol, '#000', true, inRage, superEnraged);
     });
@@ -749,14 +852,17 @@ function endGame(win, bot) {
         // replace the link based on the bot, change link color and make the link hyperlink
         document.getElementById('end-title').innerText = "BỊ BẮT RỒI!";
         document.getElementById('end-title').style.color = "red";
-        document.getElementById('end-subtitle').innerText = "Từ đây đến hết kỳ nghỉ hè của bạn, phải giải tất cả bài tập tại ";
-        const linkElement = document.createElement('a');
-        linkElement.href = links[bot];
-        linkElement.target = "_blank";
-        linkElement.style.color = "#3b82f6";
-        linkElement.innerText = links[bot];
-        document.getElementById('end-subtitle').appendChild(linkElement);
-        playSfx(60, 'sawtooth', 0.8, 0.4, 30);
+        if (selectedBot != 'anh') {    
+            document.getElementById('end-subtitle').innerText = "Từ đây đến hết kỳ nghỉ hè của bạn, phải giải tất cả bài tập tại ";
+            const linkElement = document.createElement('a');
+            linkElement.href = links[bot];
+            linkElement.target = "_blank";
+            linkElement.style.color = "#3b82f6";
+            linkElement.innerText = links[bot];
+            document.getElementById('end-subtitle').appendChild(linkElement);
+        } else {
+            document.getElementById('end-subtitle').innerText = "Từ đây đến hết kỳ nghỉ hè, bạn phải đi học thêm tại nhà cô!";
+        }
     }
 }
 
@@ -830,8 +936,8 @@ window.selectMode = (m) => {
 
 window.selectBot = (b) => {
     selectedBot = b;
-    ['quyen', 'tin', 'luom'].forEach(id => document.getElementById('bot-' + id).classList.toggle('selected-box', id === b));
-    const n = { quyen: 'MISS QUEEN', tin: 'MR TING', luom: 'MR LERM' };
+    ['quyen', 'anh', 'tin', 'luom'].forEach(id => document.getElementById('bot-' + id).classList.toggle('selected-box', id === b));
+    const n = { quyen: 'MISS QUEEN', anh: 'MISS ANH', tin: 'MR TING', luom: 'MR LERM' };
     document.getElementById('ui-bot-badge').innerText = `ĐỐI THỦ: ${n[b]}`;
 };
 
@@ -867,7 +973,7 @@ window.addEventListener('keyup', e => {
 });
 
 window.addEventListener('resize', initCanvas);
-
+document.getElementById('ver').innerText = 'V' + version;
 selectChar('khang');
 selectMode('normal');
 selectBot('quyen');
