@@ -421,7 +421,7 @@ function update() {
     const isHard = gameMode === 'hard';
 
     // BOT STATES
-    const rageCycle = 15000;
+    const rageCycle = 10000;
     const rageDuration = 5000;
     const isCommonRage = elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
     // BOT Specialty Logic
