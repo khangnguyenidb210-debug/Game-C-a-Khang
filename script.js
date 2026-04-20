@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.0.0 (build 1)";
+const version = "1.0.1 (build 2)";
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
@@ -364,7 +364,7 @@ function useU() {
         }
         if (isPunchSuccess) {
             spawnShockwave(player.x, player.y, 'rgba(16, 219, 255, 0.8)');
-            playSound('assets/punchsucess.mp3', 0.7);
+            playSound('assets/punchsucess.mp3', 0.5);
         } else playSound('assets/doh-i-missed.mp3', 0.75)
 
     } else if (selectedChar === 'loi') {
@@ -421,8 +421,8 @@ function useI() {
             player.khangTraps--;
             document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: ${player.khangTraps}`;
             playSfx(900, 'sine', 0.1);
-            return;
-        }
+        } else iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1)
+        return;
     }
     if (now < iCD) return;
     if (selectedChar === 'khang') {
@@ -448,8 +448,7 @@ function useI() {
                 spawnShockwave(b.x, b.y, '#f97316');
                 spawnShockwave(b.x, b.y, '#facc15');
             });
-            playSound('assets/rahhh.mp3', 1.0);
-            playSfx(150, 'square', 0.5, 0.4, 600);
+            playSound('assets/delete.mp3', 0.8);
             for (let i = 1; i < 6; i++) {
                 setTimeout(() => playSfx(150 + i * 80, 'sawtooth', 0.3, 0.3), i * 60);
             }
@@ -516,11 +515,10 @@ function useO() {
         player.isInvincible = true;
         player.invincibleEnd = now + 30000;
         shakeAmount = 50;
-        playSound('assets/stagger.mp3', 1.2);
+        playSound('assets/stagger.mp3', 1);
         for (let i = 0; i < 15; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, i % 3 === 0 ? '#facc15' : (i % 3 === 1 ? '#ef4444' : '#fff'));
-                playSfx(50 + i * 50, 'sawtooth', 0.2, 0.4);
             }, i * 100);
         }
     }
@@ -584,7 +582,7 @@ function update() {
         const luomDur = (isHard ? 75 : 50) + (isCommonRage ? (isHard ? 12.5 : 7) * currentLevel : 0);
         if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0) {
             isLuomCanMove = true;
-            playSound('assets/ruler-slap.mp3', 0.55);
+            playSound('assets/ruler-slap.mp3', 0.12);
         }
     }
 
@@ -636,7 +634,8 @@ function update() {
     // PLAYER MOVE
     let baseSpd = isHard ? 0.126 : 0.08;
     let mult = 1;
-    if (player.isDelayed || player.isParrying) mult = 0;
+    if (player.isDelayed) mult = 0;
+    else if (player.isParrying) mult = 0.05;
     else if (player.isParrySuccess) {
         mult = 1.3;
         player.isParrySuccess = false;
@@ -678,20 +677,11 @@ function update() {
     bots.forEach(b => {
         if (b.x <= 0 || b.x > COLS - 1 || b.y <= 0 || b.y > ROWS - 1) {
             bots.splice(bots.indexOf(b), 1);
-            // popup you just eliminated a bot + sfx
-            const popup = document.getElementById('popup-notification');
-            popup.color = '#a90808';
-            popup.innerText = "Bạn hạ gục được 1 bot!";
-            popup.classList.remove('hidden');
-            popupEnd = now + 1500;
-            let killsfx = new Audio('assets/kill.mp3');
-            killsfx.play();
-            playSfx(200, 'sine', 0.2);
             // reduce player cooldowns
-            yCD = Math.max(yCD - COOLDOWNS[selectedChar].y * (selectedBot === 'anh' ? 1.5 : 1) / (selectedChar == 'dang' ? 2 : 3), now);
-            uCD = Math.max(uCD - COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1) / (selectedChar == 'dang' ? 2 : 3), now);
-            iCD = Math.max(iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / (selectedChar == 'dang' ? 2 : 3), now);
-            oCD = Math.max(oCD - COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1) / (selectedChar == 'dang' ? 2 : 3), now);
+            yCD = Math.max(yCD - COOLDOWNS[selectedChar].y * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
+            uCD = Math.max(uCD - COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
+            iCD = Math.max(iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
+            oCD = Math.max(oCD - COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
             return;
         }
         const superEnraged = (now > b.superRageStart && now < b.superRageEnd);
@@ -704,18 +694,9 @@ function update() {
         traps.forEach((t, idx) => {
             if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
                 b.delayUntil = now + (isHard ? 2500 : 3500);
-                const popup = document.getElementById('popup-notification');
-                popup.color = '#449fef';
-                popup.innerText = "Bạn bẫy được 1 bot!";
-                popup.classList.remove('hidden');
-                popupEnd = now + 1500;
-                traps.splice(idx, 1);
                 spawnShockwave(t.x, t.y, '#fff');
-                if (selectedBot == 'luom') {
-                    b.superRageStart = now + delayTime;
-                    b.superRageEnd = now + delayTime + 7000;
-                }
                 playSfx(200, 'sine', 0.2);
+                traps.splice(idx, 1);
             }
         });
 
@@ -741,7 +722,7 @@ function update() {
                 spawnShockwave(b.x, b.y, '#facc15');
                 spawnShockwave(b.x, b.y, '#ef4444');
                 shakeAmount = 15;
-                playSfx(800, 'sawtooth', 0.3, 0.4, 200);
+                playSound('assets/kill.mp3');
                 b.isDead = true;
             } else if (player.isShield && now < player.shieldEnd) {
                 player.isShield = false;
