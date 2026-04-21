@@ -49,7 +49,7 @@
 
         <!-- CHAR SELECT -->
         <h2 class="text-xl font-bold mb-4 text-slate-400 uppercase tracking-widest">Chọn Nhân Vật Chính</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 w-full max-w-6xl mb-10">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-6 w-full max-w-7xl mb-10">
             <div id="char-khang" onclick="selectChar('khang')" class="group p-6 rounded-2xl border-2 border-slate-800 cursor-pointer transition-all hover:border-green-500 hover:bg-green-500/5">
                 <div class="w-14 h-14 bg-green-500 mx-auto mb-3 rounded-2xl flex items-center justify-center text-4xl font-black shadow-[0_0_30px_rgba(34,197,94,0.5)] group-hover:scale-110 transition-transform text-black">K</div>
                 <h2 class="text-xl font-bold mb-2 uppercase">Khang Đẹp Trai</h2>
@@ -76,11 +76,19 @@
             </div>
             <div id="char-tan" onclick="selectChar('tan')" class="group p-6 rounded-2xl border-2 border-slate-800 cursor-pointer transition-all hover:border-orange-500 hover:bg-orange-500/5">
                 <div class="w-14 h-14 bg-orange-500 mx-auto mb-4 rounded-2xl flex items-center justify-center text-4xl font-black shadow-[0_0_30px_rgba(249,115,22,0.5)] group-hover:scale-110 transition-transform text-black">T</div>
-                <h2 class="text-xl font-bold mb-2 uppercase">Tân Ốm</span></h2>
+                <h2 class="text-xl font-bold mb-2 uppercase">Tân Ốm</h2>
                 <p class="skill-text mb-1"><b class="text-white">[Y] God Mode:</b> 2x tốc độ & bất tử 5s.</p>
-                <p class="skill-text mb-1"><b class="text-white">[U] Sharingan:</b> Màn đỏ, đóng băng bot 5s (bot rage 3x sau).</p>
+                <p class="skill-text mb-1"><b class="text-white">[U] Sharingan:</b> Màn đỏ, đóng băng bot 5s.</p>
                 <p class="skill-text mb-1"><b class="text-white">[I] Delete:</b> Xóa sổ tất cả thực thể.</p>
                 <p class="skill-text mb-1"><b class="text-yellow-500">[O] Ult:</b> Hunter mode - tiêu diệt & +0.25x tốc độ.</p>
+            </div>
+            <div id="char-thoai" onclick="selectChar('thoai')" class="group p-6 rounded-2xl border-2 border-slate-800 cursor-pointer transition-all hover:border-violet-400 hover:bg-violet-500/5">
+                <div class="w-14 h-14 bg-violet-400 mx-auto mb-3 rounded-2xl flex items-center justify-center text-3xl font-black shadow-[0_0_30px_rgba(167,139,250,0.5)] group-hover:scale-110 transition-transform text-black">📱</div>
+                <h2 class="text-xl font-bold mb-2 uppercase">Điện Thoại</h2>
+                <p class="skill-text mb-1"><b class="text-white">[Y] Mì Tôm Bò Khô Radio:</b> Bot 0.25x tốc độ 3s.</p>
+                <p class="skill-text mb-1"><b class="text-white">[U] Rage Bait:</b> Bot rage 2x/2s → Thoại 2x/3s.</p>
+                <p class="skill-text mb-1"><b class="text-white">[I] Ngắn Thọt:</b> <b class="text-violet-300">60%</b> Hunter 3s / <b class="text-red-400">40%</b> 0.5x tốc độ 3s.</p>
+                <p class="skill-text mb-1"><b class="text-yellow-500">[O] Black Hole:</b> Hút & diệt bot 3s.</p>
             </div>
         </div>
 
@@ -113,11 +121,6 @@
                 <div class="skill-slot border-yellow-500/50"><div id="cd-o" class="cd-overlay bg-yellow-500/40"></div><span class="z-10 font-bold text-yellow-500">O</span></div>
             </div>
         </div>
-
-        <!-- Popup Notification/Not In Use -->
-        <div id="popup-notification" class="hidden absolute top-2/5 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-xl p-4 rounded-3xl border border-white/10 shadow-2xl pointer-events-auto">
-            <p class="text-white text-lg text-center text-bold">Bạn hạ gục được 1 bot!</p>
-        </div>
     </div>
 
     <canvas id="game-canvas"></canvas>
@@ -134,7 +137,7 @@
 
     <div id="pause-overlay" class="hidden absolute inset-0 z-[205] bg-black/80 flex flex-col items-center justify-center text-center p-10">
         <div class="text-5xl font-black uppercase tracking-[0.3em] text-white mb-4">Tạm dừng</div>
-        <div class="text-sm uppercase tracking-[0.4em] text-slate-300">Nhấn [Esc] hoặc [P] để tiếp tục</div>
+        <div class="text-sm uppercase tracking-[0.4em] text-slate-300">Nhấn Esc hoặc P để tiếp tục</div>
     </div>
 
     <div id="game-over" class="hidden absolute inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center text-center p-10">
@@ -145,7 +148,6 @@
             <button onclick="returnToSelection()" class="bg-slate-800 text-white px-12 py-4 rounded-full text-xl font-bold hover:scale-110 transition-all uppercase">Trở về</button>
         </div>
     </div>
-    
     <script src="script.js"></script>
 </body>
 </html>

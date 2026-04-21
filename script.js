@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.0.1 (build 2)";
+const version = "1.0.1 (build 3)";
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
@@ -21,10 +21,15 @@ let player = {
     isTanGod: false, tanGodEnd: 0,
     isTanSharingan: false, tanSharinganEnd: 0,
     isTanUlt: false, tanUltEnd: 0,
-    countKills: 0
+    countKills: 0,
+    // Thoai skills
+    isThoaiSlow: false, thoaiSlowEnd: 0,       // [Y] bots slowed
+    isThoaiBoosted: false, thoaiBoostedEnd: 0,  // [U] Thoai speed boost after rage bait
+    isThoaiHunter: false, thoaiHunterEnd: 0,    // [I] lucky hunter
+    isThoaiPenalty: false, thoaiPenaltyEnd: 0   // [I] unlucky slow
 };
 
-let bots = [], particles = [], decoys = [], trails = [], shockwaves = [], traps = [];
+let bots = [], particles = [], decoys = [], trails = [], shockwaves = [], traps = [], blackholes = [];
 let gameActive = false, gamePaused = false, pauseStart = 0, startTime = 0, selectedChar = 'khang', gameMode = 'normal', currentLevel = 1;
 let selectedBot = 'quyen';
 let popupEnd = 0;
@@ -32,14 +37,16 @@ let yCD = 0, uCD = 0, iCD = 0, oCD = 0, freezeEnd = 0, lastBotSpawnTime = 0;
 let shakeAmount = 0, showRoad = false;
 let alarmSoundPlaying = false;
 let isRaging = false;
+
 var filterStrength = 20;
 var frameTime = 0, lastLoop = new Date, thisLoop;
 
 const COOLDOWNS = {
-    khang: { y: 4000, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 8000, u: 12000, i: 12500, o: 20000 },
+    khang: { y: 3500, u: 10000, i: 5000, o: 15000 },
+    dang: { y: 7500, u: 10000, i: 10000, o: 18000 },
     loi: { y: 6000, u: 12000, i: 5000, o: 18000 },
-    tan:  { y: 5000, u: 5000, i: 5000, o: 5000 } // dev character
+    tan:  { y: 5000, u: 5000, i: 5000, o: 5000 }, // dev character
+    thoai: { y: 5000, u: 8000, i: 15000, o: 20000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -71,6 +78,10 @@ function shiftTimers(delta) {
     player.tanGodEnd += delta;
     player.tanSharinganEnd += delta;
     player.tanUltEnd += delta;
+    player.thoaiSlowEnd += delta;
+    player.thoaiBoostedEnd += delta;
+    player.thoaiHunterEnd += delta;
+    player.thoaiPenaltyEnd += delta;
     traps.forEach(t => t.life += delta);
     decoys.forEach(d => d.lifeEnd += delta);
     bots.forEach(b => {
@@ -314,6 +325,18 @@ function useY() {
             }, i * 80);
         }
         yCD = now + COOLDOWNS.tan.y * (selectedBot === 'anh' ? 1.5 : 1);
+    } else if (selectedChar === 'thoai') {
+        // MÌ TÔM BÒ KHÔ RADIO: slow all bots to 0.25x for 3s
+        player.isThoaiSlow = true;
+        player.thoaiSlowEnd = now + 3000;
+        bots.forEach(b => { b.thoaiSlowUntil = now + 3000; });
+        shakeAmount = 10;
+        spawnShockwave(player.x, player.y, '#a78bfa');
+        for (let i = 0; i < 6; i++) {
+            setTimeout(() => spawnShockwave(player.x, player.y, '#7c3aed'), i * 80);
+        }
+        playSfx(200, 'sine', 0.3, 0.2, 100);
+        yCD = now + COOLDOWNS.thoai.y * (selectedBot === 'anh' ? 1.5 : 1);
     }
 }
 
@@ -410,6 +433,23 @@ function useU() {
                 playSfx(80 + i * 30, 'sawtooth', 0.2, 0.25);
             }, i * 100);
         }
+    } else if (selectedChar === 'thoai') {
+        // RAGE BAIT: force all bots into 2x rage for 2s, then Thoai gets 2x speed for 3s
+        bots.forEach(b => {
+            b.superRageStart = now;
+            b.superRageEnd = now + 2000;
+        });
+        shakeAmount = 20;
+        spawnShockwave(player.x, player.y, '#f43f5e');
+        playSfx(300, 'sawtooth', 0.4, 0.3, 600);
+        playSound('assets/waapp-angry.mp3', 0.7);
+        // After 2s, Thoai gets 2x speed for 3s
+        setTimeout(() => {
+            player.isThoaiBoosted = true;
+            player.thoaiBoostedEnd = Date.now() + 3000;
+            spawnShockwave(player.x, player.y, '#22c55e');
+            playSfx(600, 'sine', 0.4, 0.2, 1000);
+        }, 2000);
     }
     uCD = now + COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1);
 }
@@ -462,6 +502,26 @@ function useI() {
             }
             bots = [];
         }
+    } else if (selectedChar === 'thoai') {
+        // NGẮN THỌT: 60% hunter 3s, 40% penalty 0.5x speed 3s
+        const lucky = Math.random() < 0.6;
+        if (lucky) {
+            player.isThoaiHunter = true;
+            player.thoaiHunterEnd = now + 3000;
+            player.isInvincible = true;
+            player.invincibleEnd = now + 3000;
+            shakeAmount = 30;
+            for (let i = 0; i < 8; i++) {
+                setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#facc15' : '#ef4444'), i * 80);
+            }
+            playSfx(500, 'sawtooth', 0.5, 0.3, 800);
+        } else {
+            player.isThoaiPenalty = true;
+            player.thoaiPenaltyEnd = now + 3000;
+            shakeAmount = 15;
+            spawnShockwave(player.x, player.y, '#94a3b8');
+            playSfx(100, 'sawtooth', 0.4, 0.2, 80);
+        }
     }
     iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1);
 }
@@ -487,7 +547,7 @@ function useO() {
         player.khangTraps = 5;
         document.getElementById('trap-counter').classList.remove('hidden');
         document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: 5`;
-        playSound('assets/lets-go', 1.0);
+        playSound('assets/lets-go', 0.8);
         for (let i = 0; i < 8; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, 'rgba(255,255,255,0.8)');
@@ -529,6 +589,19 @@ function useO() {
                 spawnShockwave(player.x, player.y, i % 3 === 0 ? '#facc15' : (i % 3 === 1 ? '#ef4444' : '#fff'));
             }, i * 100);
         }
+    } else if (selectedChar === 'thoai') {
+        // BLACK HOLE: spawn at player pos, pulls bots, destroys on contact, lives 3s
+        blackholes.push({
+            x: player.x,
+            y: player.y,
+            lifeEnd: now + 3000,
+            radius: 0
+        });
+        shakeAmount = 35;
+        for (let i = 0; i < 12; i++) {
+            setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#000' : '#7c3aed'), i * 60);
+        }
+        playSfx(60, 'sawtooth', 0.6, 0.4, 40);
     }
     oCD = now + COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1);
 }
@@ -590,7 +663,7 @@ function update() {
         const luomDur = (isHard ? 75 : 50) + (isCommonRage ? (isHard ? 12.5 : 7) * currentLevel : 0);
         if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0) {
             isLuomCanMove = true;
-            playSound('assets/ruler-slap.mp3', 0.12);
+            playSound('assets/ruler-slap.mp3', 0.175);
         }
     }
 
@@ -625,6 +698,22 @@ function update() {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#f97316';
             statusEl.innerText = `🔥 HUNTER MODE! KILLS: ${player.countKills} (+${player.countKills * 25}% SPD)`;
+        } else if (selectedChar === 'thoai' && player.isThoaiSlow && now < player.thoaiSlowEnd) {
+            statusEl.classList.remove('opacity-0');
+            statusEl.style.color = '#a78bfa';
+            statusEl.innerText = '📻 MÌ TÔM! (BOT 0.25X TỐC ĐỘ)';
+        } else if (selectedChar === 'thoai' && player.isThoaiBoosted && now < player.thoaiBoostedEnd) {
+            statusEl.classList.remove('opacity-0');
+            statusEl.style.color = '#22c55e';
+            statusEl.innerText = '⚡ RAGE BAIT! (THOAI 2X TỐC ĐỘ)';
+        } else if (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd) {
+            statusEl.classList.remove('opacity-0');
+            statusEl.style.color = '#facc15';
+            statusEl.innerText = '🎯 NGẮN THỌT! (HUNTER 3S)';
+        } else if (selectedChar === 'thoai' && player.isThoaiPenalty && now < player.thoaiPenaltyEnd) {
+            statusEl.classList.remove('opacity-0');
+            statusEl.style.color = '#94a3b8';
+            statusEl.innerText = '💀 XUI XẺO! (0.5X TỐC ĐỘ 3S)';
         } else {
             statusEl.style.color = '';
             statusEl.classList.add('opacity-0');
@@ -632,7 +721,7 @@ function update() {
     }
 
     // SPAWN
-    const maxBots = (isHard ? [5, 12, 20][currentLevel - 1] : [3, 6, 9][currentLevel - 1]);
+    const maxBots = (isHard ? [5, 7, 11, 15, 18][currentLevel - 1] : [3, 6, 9, 12, 15][currentLevel - 1]);
     const spawnInterval = (isHard ? 2500 : 4000) - (selectedBot == 'luom' ? 1250 : 0);
     if (elapsed > 2000 - (selectedBot == 'luom' ? 1250 : 0) && (bots.length < maxBots) && (now - lastBotSpawnTime > spawnInterval)) {
         bots.push({
@@ -646,7 +735,7 @@ function update() {
     }
 
     // PLAYER MOVE
-    let baseSpd = isHard ? 0.126 : 0.08;
+    let baseSpd = isHard ? 0.126 : 0.07 + ((isHard ? 0.075 : 0.015) * currentLevel);
     let mult = 1;
     if (player.isDelayed) mult = 0;
     else if (player.isParrying) mult = 0.015;
@@ -662,6 +751,8 @@ function update() {
         if (player.isSlowed && now < player.slowEnd) mult *= 0.25;
         if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) mult *= 2.0;
         if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) mult *= (1.0 + player.tanUltKills * 0.25);
+        if (selectedChar === 'thoai' && player.isThoaiBoosted && now < player.thoaiBoostedEnd) mult *= 2.0;
+        if (selectedChar === 'thoai' && player.isThoaiPenalty && now < player.thoaiPenaltyEnd) mult *= 0.5;
     }
     let pSpd = baseSpd * mult;
     if (pSpd > 0) {
@@ -679,6 +770,9 @@ function update() {
     }
     if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) {
         spawnTrail(player.x, player.y, 'rgba(239,68,68,0.8)');
+    }
+    if (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd) {
+        spawnTrail(player.x, player.y, 'rgba(250,204,21,0.8)');
     }
     resolveWallStick();
 
@@ -702,6 +796,8 @@ function update() {
         let finalBSpd = bSpdBase;
         if (superEnraged) finalBSpd *= (selectedBot === 'luom' ? 3.45 : 3.0);
         else if (isCommonRage) finalBSpd *= 2.0;
+        // Thoai [Y]: slow bots
+        if (selectedChar === 'thoai' && b.thoaiSlowUntil && now < b.thoaiSlowUntil) finalBSpd *= 0.25;
         if (isLuomCanMove){
             spawnTrail(b.x, b.y, '#ef4444');
         };
@@ -730,8 +826,8 @@ function update() {
         }
         // collision with player
         if (Math.sqrt((player.x - b.x) ** 2 + (player.y - b.y) ** 2) < 0.5) {
-            if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) {
-                // Hunter mode: destroy bot, gain speed
+            if ((selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) ||
+                (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd)) {
                 player.countKills++;
                 spawnShockwave(b.x, b.y, '#facc15');
                 spawnShockwave(b.x, b.y, '#ef4444');
@@ -762,12 +858,12 @@ function update() {
                     if (selectedBot === 'tin') 
                         playSound('assets/rahhh.mp3');
                     else if (selectedBot === 'luom')
-                        playSound('assets/gotta-sweep.mp3', 0.7);
+                        playSound('assets/gotta-sweep.mp3');
                     else
                         playSound('assets/waapp-angry.mp3');
                 }
                 // show parry picture + ease-out + sfx in assets
-                const parry = document.getElementById('parry-flash');
+                const parry = document.getElementById('parry');
                 parry.classList.remove('hidden');
                 parry.style.opacity = 1;
                 setTimeout(() => {
@@ -778,6 +874,7 @@ function update() {
                     parry.classList.add('hidden');
                     parry.style.transition = 'none';
                 }, 600);
+                // play custom parry sfx in assets
                 playSound('assets/parry.mp3');
             } else if (!player.isGhost && freezeEnd < now && (!player.isInvincible || now > player.invincibleEnd)) {
                 endGame(false, selectedBot);
@@ -786,15 +883,38 @@ function update() {
         }
     });
     bots = bots.filter(b => !b.isDead);
+
+    // BLACK HOLE update (Thoai [O])
+    blackholes = blackholes.filter(bh => now < bh.lifeEnd);
+    blackholes.forEach(bh => {
+        bh.radius = Math.min(bh.radius + 0.15, 5);
+        bots.forEach(b => {
+            const dx = bh.x - b.x, dy = bh.y - b.y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < 0.4) {
+                b.isDead = true;
+                spawnShockwave(bh.x, bh.y, '#7c3aed');
+                spawnShockwave(bh.x, bh.y, '#000');
+                playSound('assets/kill.mp3', 0.8);
+            } else if (d < bh.radius) {
+                const pullStr = 0.04 * (1 - d / bh.radius);
+                b.x += (dx / d) * pullStr * 5;
+                b.y += (dy / d) * pullStr * 5;
+            }
+        });
+        bots = bots.filter(b => !b.isDead);
+    });
+
     // LEVELING
     if (maze[Math.floor(player.y)][Math.floor(player.x)] === 'K') {
-        if (currentLevel < 3) {
+        if (currentLevel < 5) {
             currentLevel++;
             generateMaze();
             bots = [];
             trails = [];
             decoys = [];
             shockwaves = [];
+            blackholes = [];
             traps = [];
             startTime = now;
             player.x = 1.5;
@@ -833,6 +953,10 @@ function update() {
     if (now > player.tanGodEnd) player.isTanGod = false;
     if (now > player.tanSharinganEnd) player.isTanSharingan = false;
     if (now > player.tanUltEnd) player.isTanUlt = false;
+    if (now > player.thoaiSlowEnd) player.isThoaiSlow = false;
+    if (now > player.thoaiBoostedEnd) player.isThoaiBoosted = false;
+    if (now > player.thoaiHunterEnd) { player.isThoaiHunter = false; player.isInvincible = false; }
+    if (now > player.thoaiPenaltyEnd) player.isThoaiPenalty = false;
 
     if (player.isUlt) {
         let color = selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'khang' ? '#fff' : '#6366f1');
@@ -919,6 +1043,39 @@ function draw(inRage) {
         ctx.shadowBlur = 0;
     });
 
+    // Draw black holes (Thoai [O])
+    const nowDraw = Date.now();
+    blackholes.forEach(bh => {
+        const cx = bh.x * TILE_SIZE, cy = bh.y * TILE_SIZE;
+        const pulse = 0.7 + 0.3 * Math.sin(nowDraw / 120);
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, bh.radius * TILE_SIZE);
+        grad.addColorStop(0, 'rgba(124,58,237,0.9)');
+        grad.addColorStop(0.4, 'rgba(0,0,0,0.85)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.max(bh.radius * TILE_SIZE, TILE_SIZE * 0.5), 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx, cy, TILE_SIZE * 0.35 * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = '#000';
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = '#7c3aed';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(nowDraw / 300);
+        ctx.strokeStyle = `rgba(167, 139, 250, ${0.4 + 0.3 * pulse})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 6]);
+        ctx.beginPath();
+        ctx.arc(0, 0, TILE_SIZE * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+    });
+
     decoys.forEach(d => drawEntity(
         d.x, d.y, 'rgba(255,255,255,0.3)', '#000'
     ));
@@ -952,13 +1109,16 @@ function draw(inRage) {
     });
     ctx.globalAlpha = 1;
 
-    let pCol = selectedChar === 'khang' ? '#22c55e' : (selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'loi' ? '#6366f1' : '#f97316'));
+    let pCol = selectedChar === 'khang' ? '#22c55e' : (selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'loi' ? '#6366f1' : (selectedChar === 'thoai' ? '#a78bfa' : '#f97316')));
     if (player.isUlt && selectedChar === 'dang') pCol = '#fbbf24';
     if (player.isDelayed) pCol = '#475569';
     if (player.isParrying) pCol = '#7ec8d5';
     if (player.isGhost && selectedChar === 'dang') pCol = 'rgba(6, 182, 212, 0.5)';
     if (selectedChar === 'tan' && player.isTanGod && Date.now() < player.tanGodEnd) pCol = '#facc15';
     if (selectedChar === 'tan' && player.isTanUlt && Date.now() < player.tanUltEnd) pCol = '#ef4444';
+    if (selectedChar === 'thoai' && player.isThoaiHunter && Date.now() < player.thoaiHunterEnd) pCol = '#facc15';
+    if (selectedChar === 'thoai' && player.isThoaiBoosted && Date.now() < player.thoaiBoostedEnd) pCol = '#22c55e';
+    if (selectedChar === 'thoai' && player.isThoaiPenalty && Date.now() < player.thoaiPenaltyEnd) pCol = '#475569';
     if (selectedChar === 'tan' && player.isTanSharingan && Date.now() < player.tanSharinganEnd) {
         // Sharingan: tint the whole canvas red
         ctx.save();
@@ -1000,8 +1160,8 @@ function endGame(win, bot) {
         document.getElementById('end-title').innerText = "BẠN THẮNG!";
         document.getElementById('end-title').style.color = "#22c55e";
         document.getElementById('end-subtitle').innerText = "Bạn đã trốn thoát thành công và hãy tận hưởng kỳ nghỉ hè dài đằng đẳng của bạn!";
+        setTimeout(() => { playSound('assets/winning.mp3'); }, 100);
     } else {
-        // replace the link based on the bot, change link color and make the link hyperlink
         document.getElementById('end-title').innerText = "BỊ BẮT RỒI!";
         document.getElementById('end-title').style.color = "red";
         if (selectedBot === 'anh') {
@@ -1025,6 +1185,7 @@ function resetGameState() {
     trails = [];
     shockwaves = [];
     traps = [];
+    blackholes = [];
     gameActive = false;
     gamePaused = false;
     pauseStart = 0;
@@ -1049,7 +1210,11 @@ function resetGameState() {
         isTanGod: false, tanGodEnd: 0,
         isTanSharingan: false, tanSharinganEnd: 0,
         isTanUlt: false, tanUltEnd: 0,
-        countKills: 0
+        countKills: 0,
+        isThoaiSlow: false, thoaiSlowEnd: 0,
+        isThoaiBoosted: false, thoaiBoostedEnd: 0,
+        isThoaiHunter: false, thoaiHunterEnd: 0,
+        isThoaiPenalty: false, thoaiPenaltyEnd: 0
     };
     document.getElementById('warning-flash').classList.remove('delay-warning');
     document.getElementById('warning-flash').classList.remove('slow-warning');
@@ -1071,6 +1236,7 @@ function returnToGame() {
     document.getElementById('game-ui').classList.remove('hidden');
     currentLevel = 1;
     generateMaze();
+    document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
     gameActive = true;
     startTime = Date.now();
     update();
@@ -1079,8 +1245,8 @@ function returnToGame() {
 
 window.selectChar = (c) => {
     selectedChar = c;
-    const colors = { khang: '#22c55e', dang: '#06b6d4', loi: '#6366f1', tan: '#f97316' };
-    ['khang', 'dang', 'loi', 'tan'].forEach(id => {
+    const colors = { khang: '#22c55e', dang: '#06b6d4', loi: '#6366f1', tan: '#f97316', thoai: '#a78bfa' };
+    ['khang', 'dang', 'loi', 'tan', 'thoai'].forEach(id => {
         const el = document.getElementById('char-' + id);
         if (!el) return;
         el.style.borderColor = (id === c ? colors[id] : '#1e293b');
@@ -1133,12 +1299,12 @@ window.addEventListener('keyup', e => {
     if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = false;
 });
 
-window.addEventListener('resize', initCanvas);
-document.getElementById('vers').innerText = 'V' + version;
 var fpsOut = document.getElementById('fps-counter');
 setInterval(function(){
     fpsOut.innerHTML = (frameTime ? Math.round(1000/frameTime) : "-") + " fps";
 }, 500);
+window.addEventListener('resize', initCanvas);
+document.getElementById('vers').innerText = 'V' + version;
 selectChar('khang');
 selectMode('normal');
 selectBot('quyen');
