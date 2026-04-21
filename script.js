@@ -32,6 +32,8 @@ let yCD = 0, uCD = 0, iCD = 0, oCD = 0, freezeEnd = 0, lastBotSpawnTime = 0;
 let shakeAmount = 0, showRoad = false;
 let alarmSoundPlaying = false;
 let isRaging = false;
+var filterStrength = 20;
+var frameTime = 0, lastLoop = new Date, thisLoop;
 
 const COOLDOWNS = {
     khang: { y: 4000, u: 10000, i: 5000, o: 15000 },
@@ -485,7 +487,7 @@ function useO() {
         player.khangTraps = 5;
         document.getElementById('trap-counter').classList.remove('hidden');
         document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: 5`;
-        playSound('assets/i-gotta-get-outta-here.mp3', 0.6);
+        playSound('assets/lets-go', 1.0);
         for (let i = 0; i < 8; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, 'rgba(255,255,255,0.8)');
@@ -707,7 +709,7 @@ function update() {
             if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
                 b.delayUntil = now + (isHard ? 2500 : 3500);
                 spawnShockwave(t.x, t.y, '#fff');
-                playSound('assets/ahhhhhhhhhh.mp3', 0.5);
+                playSound('assets/ahhhhhhhhhh.mp3', 0.4);
                 traps.splice(idx, 1);
             }
         });
@@ -760,12 +762,12 @@ function update() {
                     if (selectedBot === 'tin') 
                         playSound('assets/rahhh.mp3');
                     else if (selectedBot === 'luom')
-                        playSound('assets/gotta-sweep.mp3');
+                        playSound('assets/gotta-sweep.mp3', 0.7);
                     else
                         playSound('assets/waapp-angry.mp3');
                 }
                 // show parry picture + ease-out + sfx in assets
-                const parry = document.getElementById('parry');
+                const parry = document.getElementById('parry-flash');
                 parry.classList.remove('hidden');
                 parry.style.opacity = 1;
                 setTimeout(() => {
@@ -776,7 +778,6 @@ function update() {
                     parry.classList.add('hidden');
                     parry.style.transition = 'none';
                 }, 600);
-                // play custom parry sfx in assets
                 playSound('assets/parry.mp3');
             } else if (!player.isGhost && freezeEnd < now && (!player.isInvincible || now > player.invincibleEnd)) {
                 endGame(false, selectedBot);
@@ -842,6 +843,10 @@ function update() {
     updateUI(now);
     draw(isCommonRage & isRageable);
     requestAnimationFrame(update);
+
+    var thisFrameTime = (thisLoop=new Date) - lastLoop;
+    frameTime += (thisFrameTime - frameTime) / filterStrength;
+    lastLoop = thisLoop;
 }
 
 /**
@@ -1130,6 +1135,10 @@ window.addEventListener('keyup', e => {
 
 window.addEventListener('resize', initCanvas);
 document.getElementById('vers').innerText = 'V' + version;
+var fpsOut = document.getElementById('fps-counter');
+setInterval(function(){
+    fpsOut.innerHTML = (frameTime ? Math.round(1000/frameTime) : "-") + " fps";
+}, 500);
 selectChar('khang');
 selectMode('normal');
 selectBot('quyen');

@@ -9,6 +9,7 @@
 </head>
 <body class="flex items-center justify-center min-h-screen">
 
+    <div id="fps-counter" class="absolute top-2 right-2 text-xm font-bold text-slate-500 uppercase tracking-widest">FPS <!-- FPS --></div>
     <!-- SELECTION SCREEN -->
     <div id="selection-screen" class="absolute inset-0 z-[110] flex flex-col items-center justify-start bg-[#020617] p-6 text-center overflow-y-auto">
         <!-- TITLE & INFO -->
@@ -17,7 +18,7 @@
             <p class="text-green-500 font-bold tracking-[0.5em] mb-4 uppercase animate-pulse">Code & Design by Khang Nguyen and Loi</p>
         </div>
         <!-- VERSION -->
-        <div id="vers" class="absolute top-2 right-2 text-xm font-bold text-slate-500 uppercase tracking-widest">Version</div>
+        <div id="vers" class="absolute bottom-2 right-2 text-xm font-bold text-slate-500 uppercase tracking-widest">Version</div>
         
         <!-- MODE SELECT -->
         <div class="flex gap-4 mb-8">
@@ -113,14 +114,9 @@
             </div>
         </div>
 
-        <!-- Popup Notification -->
+        <!-- Popup Notification/Not In Use -->
         <div id="popup-notification" class="hidden absolute top-2/5 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-xl p-4 rounded-3xl border border-white/10 shadow-2xl pointer-events-auto">
             <p class="text-white text-lg text-center text-bold">Bạn hạ gục được 1 bot!</p>
-        </div>
-
-        <!-- Parry Picture Notification Fullscreen -->
-        <div id="parry" class="hidden absolute inset-0 z-[210] flex items-center justify-center pointer-events-none">
-            <img src="assets/parry.jpeg" alt="Parry" class="w-full h-full">
         </div>
     </div>
 
@@ -138,7 +134,7 @@
 
     <div id="pause-overlay" class="hidden absolute inset-0 z-[205] bg-black/80 flex flex-col items-center justify-center text-center p-10">
         <div class="text-5xl font-black uppercase tracking-[0.3em] text-white mb-4">Tạm dừng</div>
-        <div class="text-sm uppercase tracking-[0.4em] text-slate-300">Nhấn Esc hoặc P để tiếp tục</div>
+        <div class="text-sm uppercase tracking-[0.4em] text-slate-300">Nhấn [Esc] hoặc [P] để tiếp tục</div>
     </div>
 
     <div id="game-over" class="hidden absolute inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center text-center p-10">
