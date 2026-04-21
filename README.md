@@ -29,3 +29,4 @@ Kĩ năng: Y-U-I-O (chiêu 1/2/3, util)
 # **Gameplay**
 ![gameplay1](https://github.com/khangnguyenidb210-debug/Game-C-a-Khang/blob/test/assets/previews/gameplay1.png)
 ![gameplay2](https://github.com/khangnguyenidb210-debug/Game-C-a-Khang/blob/test/assets/previews/gameplay2.png)
+![gameplay3](https://github.com/khangnguyenidb210-debug/Game-C-a-Khang/blob/test/assets/previews/gameplay3.png)

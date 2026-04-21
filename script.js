@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.0.1 (build 3)";
+const version = "1.0.1 (build 4)";
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
@@ -318,10 +318,10 @@ function useY() {
         player.isInvincible = true;
         player.invincibleEnd = now + 5000;
         shakeAmount = 20;
+        playSound('assets/sasuke.mp3', 0.9);
         for (let i = 0; i < 10; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, i % 2 ? '#facc15' : '#fff');
-                playSfx(300 + i * 80, 'sine', 0.15, 0.3);
             }, i * 80);
         }
         yCD = now + COOLDOWNS.tan.y * (selectedBot === 'anh' ? 1.5 : 1);
@@ -335,7 +335,18 @@ function useY() {
         for (let i = 0; i < 6; i++) {
             setTimeout(() => spawnShockwave(player.x, player.y, '#7c3aed'), i * 80);
         }
-        playSfx(200, 'sine', 0.3, 0.2, 100);
+        const mitombokho = document.getElementById('mitombokho-flash');
+        mitombokho.classList.remove('hidden');
+        mitombokho.style.opacity = 1;
+        setTimeout(() => {
+            mitombokho.style.transition = 'opacity 0.7s ease-out';
+            mitombokho.style.opacity = 0;
+        }, 300);
+        setTimeout(() => {
+            mitombokho.classList.add('hidden');
+            mitombokho.style.transition = 'none';
+        }, 600);
+        playSound('assets/mitombokhoradio.mp3', 0.67);
         yCD = now + COOLDOWNS.thoai.y * (selectedBot === 'anh' ? 1.5 : 1);
     }
 }
@@ -390,7 +401,10 @@ function useU() {
         if (isPunchSuccess) {
             spawnShockwave(player.x, player.y, 'rgba(16, 219, 255, 0.8)');
             playSound('assets/punchsucess.mp3', 0.5);
-        } else playSound('assets/doh-i-missed.mp3', 0.75)
+        } else {
+            playSound('assets/doh-i-missed.mp3', 0.75);
+            playSound('assets/missing.mp3', 0.8)
+        }
 
     } else if (selectedChar === 'loi') {
         freezeEnd = now + 3000;
@@ -441,14 +455,13 @@ function useU() {
         });
         shakeAmount = 20;
         spawnShockwave(player.x, player.y, '#f43f5e');
-        playSfx(300, 'sawtooth', 0.4, 0.3, 600);
-        playSound('assets/waapp-angry.mp3', 0.7);
+        playSound('assets/yeah_come_get_some_ya_freakin_wuss.mp3', 1.0)
         // After 2s, Thoai gets 2x speed for 3s
         setTimeout(() => {
             player.isThoaiBoosted = true;
             player.thoaiBoostedEnd = Date.now() + 3000;
             spawnShockwave(player.x, player.y, '#22c55e');
-            playSfx(600, 'sine', 0.4, 0.2, 1000);
+            playSound('assets/afterragebait.mp3', 0.7);
         }, 2000);
     }
     uCD = now + COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1);
@@ -514,14 +527,13 @@ function useI() {
             for (let i = 0; i < 8; i++) {
                 setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#facc15' : '#ef4444'), i * 80);
             }
-            playSfx(500, 'sawtooth', 0.5, 0.3, 800);
         } else {
             player.isThoaiPenalty = true;
             player.thoaiPenaltyEnd = now + 3000;
             shakeAmount = 15;
             spawnShockwave(player.x, player.y, '#94a3b8');
-            playSfx(100, 'sawtooth', 0.4, 0.2, 80);
         }
+        playSound('assets/motcaichettruyenthong.mp3', 0.67);
     }
     iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1);
 }
@@ -601,7 +613,7 @@ function useO() {
         for (let i = 0; i < 12; i++) {
             setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#000' : '#7c3aed'), i * 60);
         }
-        playSfx(60, 'sawtooth', 0.6, 0.4, 40);
+        playSound('assets/black-hole.mp3', 0.67);
     }
     oCD = now + COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1);
 }
@@ -863,7 +875,7 @@ function update() {
                         playSound('assets/waapp-angry.mp3');
                 }
                 // show parry picture + ease-out + sfx in assets
-                const parry = document.getElementById('parry');
+                const parry = document.getElementById('parry-flash');
                 parry.classList.remove('hidden');
                 parry.style.opacity = 1;
                 setTimeout(() => {
@@ -923,9 +935,7 @@ function update() {
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
             endGame(true, selectedBot);
-            setTimeout(() => {
-                playSound('assets/winning.mp3');
-            }, 100);
+            playSound('assets/winning.mp3');
         }
     }
 
