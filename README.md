@@ -1,7 +1,7 @@
 # **ESCAPE FROM THE TECHNOLOGY TEACHER**
 ![main](https://github.com/khangnguyenidb210-debug/Game-C-a-Khang/blob/test/assets/previews/main.png)
 
-Tựa game ban đầu được viết với C++ của Khang và được chuyển hóa thành code HTML + CSS + JavaScript, cùng với sự hỗ trợ code từ Gemini, Lợi và ý tưởng nền móng code ban đầu đã tạo ra tựa game "ESCAPE FROM THE TECHNOLOGY TEACHER".
+Tựa game ban đầu được viết với C++ của Khang và được chuyển thành code HTML + CSS + JavaScript, cùng với sự hỗ trợ code từ Lợi và ý tưởng nền móng code ban đầu đã tạo ra tựa game "ESCAPE FROM THE TECHNOLOGY TEACHER".
 
 # **Lưu ý**
 Game được thiết kế cho PC/Laptop, không phù hợp với điện thoại và các thiết bị khác tương tự!
