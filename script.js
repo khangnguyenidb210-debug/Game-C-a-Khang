@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.0.1 (build 4)";
+const version = "1.0.1 (build 5)";
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
@@ -46,7 +46,7 @@ const COOLDOWNS = {
     dang: { y: 7500, u: 10000, i: 10000, o: 18000 },
     loi: { y: 6000, u: 12000, i: 5000, o: 18000 },
     tan:  { y: 5000, u: 5000, i: 5000, o: 5000 }, // dev character
-    thoai: { y: 5000, u: 8000, i: 15000, o: 20000 }
+    thoai: { y: 6000, u: 7000, i: 11000, o: 20000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -401,10 +401,7 @@ function useU() {
         if (isPunchSuccess) {
             spawnShockwave(player.x, player.y, 'rgba(16, 219, 255, 0.8)');
             playSound('assets/punchsucess.mp3', 0.5);
-        } else {
-            playSound('assets/doh-i-missed.mp3', 0.75);
-            playSound('assets/missing.mp3', 0.8)
-        }
+        } else playSound('assets/missing.mp3', 0.8)
 
     } else if (selectedChar === 'loi') {
         freezeEnd = now + 3000;
@@ -494,7 +491,7 @@ function useI() {
         });
         playSfx(700, 'sine', 0.3);
     } else if (selectedChar === 'dang') {
-        player.parryEnd = now + 1500;
+        player.parryEnd = now + 1250;
         player.isParrying = true;
         playSfx(1000, 'triangle', 0.4);
         spawnShockwave(player.x, player.y, '#cecece');
@@ -633,10 +630,10 @@ function update() {
     const rageDuration = 5000;
     const isCommonRage = isRageable && elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
     // BOT Specialty Logic
-    // Queen delays the player for 3 seconds (4.5 seconds on hard mode)
-    if (selectedBot === 'quyen' && !player.isDelayed && elapsed > 5000 && (elapsed % (10000 + 1250 * (currentLevel-1))) < 50) {
+    // Queen delays the player for 3 seconds
+    if (selectedBot === 'quyen' && !player.isDelayed && elapsed > 5000 && (elapsed % (10000 + 1500 * (currentLevel-1))) < 50) {
         player.isDelayed = true;
-        player.delayEnd = now + (isHard ? 4500 : 3000);
+        player.delayEnd = now + 3000;
         document.getElementById('warning-flash').classList.add('delay-warning');
         playSound('assets/delaying.mp3', 0.9);
         playSfx(450, 'square', 0.5);
@@ -670,9 +667,9 @@ function update() {
     }
     // Lerm movement
     let isLuomCanMove = false;
-    let tick = 500 - currentLevel * 45 - (isCommonRage ? 12 * currentLevel : 0) - (isHard ? 6 * currentLevel : 4 * currentLevel);
+    let tick = 550 - currentLevel * 25 - (isCommonRage ? 8 * currentLevel : 0) - (isHard ? 5 * currentLevel : 3 * currentLevel);
     if (selectedBot === 'luom' && elapsed > tick) {
-        const luomDur = (isHard ? 75 : 50) + (isCommonRage ? (isHard ? 12.5 : 7) * currentLevel : 0);
+        const luomDur = (isHard ? 75 : 50) + (isCommonRage ? (isHard ? 12 : 6) * currentLevel : 0);
         if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0) {
             isLuomCanMove = true;
             playSound('assets/ruler-slap.mp3', 0.175);
@@ -682,7 +679,7 @@ function update() {
     const statusEl = document.getElementById('bot-status');
     if (isCommonRage) {
         statusEl.classList.remove('opacity-0');
-        statusEl.innerText = "BOT PHẪN NỘ! (2X SPEED)";
+        statusEl.innerText = "BOT RAGE! (2X SPEED)";
         statusEl.style.color = '';
         if (!isRaging) {
             if (selectedBot !== 'quyen') 
@@ -701,7 +698,7 @@ function update() {
         } else if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#facc15';
-            statusEl.innerText = "⚡ GOD MODE! (5X TỐC ĐỘ + BẤT TỬ)";
+            statusEl.innerText = "⚡ GOD MODE! (2X TỐC ĐỘ + BẤT TỬ)";
         } else if (selectedChar === 'tan' && player.isTanSharingan && now < player.tanSharinganEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#ef4444';
@@ -717,7 +714,7 @@ function update() {
         } else if (selectedChar === 'thoai' && player.isThoaiBoosted && now < player.thoaiBoostedEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#22c55e';
-            statusEl.innerText = '⚡ RAGE BAIT! (THOAI 2X TỐC ĐỘ)';
+            statusEl.innerText = '⚡ RAGE BAIT! (2X TỐC ĐỘ)';
         } else if (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#facc15';
@@ -725,7 +722,7 @@ function update() {
         } else if (selectedChar === 'thoai' && player.isThoaiPenalty && now < player.thoaiPenaltyEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#94a3b8';
-            statusEl.innerText = '💀 XUI XẺO! (0.5X TỐC ĐỘ 3S)';
+            statusEl.innerText = '💀 XUI XẺO! (0.5X TỐC ĐỘ)';
         } else {
             statusEl.style.color = '';
             statusEl.classList.add('opacity-0');
@@ -737,7 +734,8 @@ function update() {
     const spawnInterval = (isHard ? 2500 : 4000) - (selectedBot == 'luom' ? 1250 : 0);
     if (elapsed > 2000 - (selectedBot == 'luom' ? 1250 : 0) && (bots.length < maxBots) && (now - lastBotSpawnTime > spawnInterval)) {
         bots.push({
-            x: 1.5, y: 1.5, delayUntil: now + 500 + (selectedBot == 'luom' ? 250 : 0), nextPathUpdate: 0,
+            x: 1.5, y: 1.5, delayUntil: now + 500 
+                                        + ((selectedBot == 'luom' || selectedBot == 'tin') ? 250 : 0), nextPathUpdate: 0,
             currentPath: [], rageUntil: 0,
             superRageStart: 0, superRageEnd: 0,
             isDead: false
@@ -747,7 +745,7 @@ function update() {
     }
 
     // PLAYER MOVE
-    let baseSpd = isHard ? 0.126 : 0.07 + ((isHard ? 0.075 : 0.015) * currentLevel);
+    let baseSpd = isHard ? 0.135 : 0.065 + ((isHard ? 0.0675 : 0.0125) * currentLevel);
     let mult = 1;
     if (player.isDelayed) mult = 0;
     else if (player.isParrying) mult = 0.015;
@@ -762,7 +760,10 @@ function update() {
         if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.6);
         if (player.isSlowed && now < player.slowEnd) mult *= 0.25;
         if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) mult *= 2.0;
-        if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) mult *= (1.0 + player.tanUltKills * 0.25);
+        if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) {
+            mult *= (1.0 + player.tanUltKills * 0.25);
+            mult = Math.Min(mult, 2.5);
+        }
         if (selectedChar === 'thoai' && player.isThoaiBoosted && now < player.thoaiBoostedEnd) mult *= 2.0;
         if (selectedChar === 'thoai' && player.isThoaiPenalty && now < player.thoaiPenaltyEnd) mult *= 0.5;
     }
@@ -920,6 +921,8 @@ function update() {
     // LEVELING
     if (maze[Math.floor(player.y)][Math.floor(player.x)] === 'K') {
         if (currentLevel < 5) {
+            player.isSpeedBoost = true;
+            player.speedBoostEnd = 3000;
             currentLevel++;
             generateMaze();
             bots = [];
@@ -931,6 +934,10 @@ function update() {
             startTime = now;
             player.x = 1.5;
             player.y = 1.5;
+            yCD = Math.max(yCD - COOLDOWNS[selectedChar].y * (selectedBot === 'anh' ? 1.5 : 1) / 1.5, now);
+            uCD = Math.max(uCD - COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1) / 1.5, now);
+            iCD = Math.max(iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 1.5, now);
+            oCD = Math.max(oCD - COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1) / 1.5, now);
             playSfx(500, 'sine', 0.5, 0.2, 1200);
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
@@ -948,12 +955,16 @@ function update() {
     if (shakeAmount > 0) shakeAmount *= 0.92;
 
     if (now > freezeEnd) freezeEnd = 0;
-    if (now > player.parryEnd) player.isParrying = false;
+    if (now > player.parryEnd) {
+        if (player.isParrying && !player.isParrySuccess) playSound('assets/missing.mp3', 0.8)
+        player.isParrying = false;
+    }
     if (now > player.ghostEnd) player.isGhost = false;
     if (now > player.coffeeEnd) player.isCoffee = false;
     if (now > player.shieldEnd) player.isShield = false;
     if (now > player.invincibleEnd) player.isInvincible = false;
     if (now > player.medalSpeedEnd) player.isMedalSpeed = false;
+    if (now > player.speedBoostEnd) player.isSpeedBoost = false;
     if (now > player.ultEnd) {
         if (player.isUlt && selectedChar === 'khang') 
             document.getElementById('trap-counter').classList.add('hidden');
@@ -1215,6 +1226,7 @@ function resetGameState() {
         isDelayed: false, delayEnd: 0,
         isParrying: false, parryEnd: 0,
         isInvincible: false, invincibleEnd: 0,
+        isSpeedBoost: true, speedBoostEnd: 3000,
         isParrySuccess: false,
         isSlowed: false, slowEnd: 0,
         isTanGod: false, tanGodEnd: 0,
