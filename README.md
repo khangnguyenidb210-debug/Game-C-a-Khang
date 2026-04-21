@@ -9,8 +9,17 @@ Game được thiết kế cho PC/Laptop, không phù hợp với điện thoạ
 Game chỉ mang tính chất giải trí và không có mục đích xúc phạm cá nhân hay tổ chức nào khác, xin cảm ơn.
 
 # **Cài đặt**
-Bạn có thể tải repo này về và mở file **index.html** với trình duyệt của bạn,
-hoặc có thể thử trực tiếp tại [đây](https://khangnguyenidb210-debug.github.io/Game-C-a-Khang/)!!!
+Bạn có thể tải repo này về và mở file **index.html** với trình duyệt của bạn:
+
+* Cài đặt thủ công:
+```<> Code → Local → Download ZIP```
+* Cài đặt với git:
+  - Main:
+    ```git clone https://github.com/khangnguyenidb210-debug/Game-C-a-Khang.git```
+  - Test:
+    ```git clone -b test --single-branch https://github.com/khangnguyenidb210-debug/Game-C-a-Khang.git```
+
+Hoặc có thể thử trực tiếp tại [đây](https://khangnguyenidb210-debug.github.io/Game-C-a-Khang/) (nhánh main).
 
 # **Cách chơi**
 Trốn thoát khỏi mê cung trước khi giáo viên bắt được bạn, dùng các kĩ năng có sẵn để sống sót!
