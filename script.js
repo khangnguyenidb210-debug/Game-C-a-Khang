@@ -43,9 +43,9 @@ var frameTime = 0, lastLoop = new Date, thisLoop;
 
 const COOLDOWNS = {
     khang: { y: 3500, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 7500, u: 10000, i: 10000, o: 18000 },
+    dang: { y: 7500, u: 10000, i: 11000, o: 18000 },
     loi: { y: 6000, u: 12000, i: 5000, o: 18000 },
-    tan:  { y: 5000, u: 5000, i: 5000, o: 5000 }, // dev character
+    tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
     thoai: { y: 6000, u: 7000, i: 11000, o: 20000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
