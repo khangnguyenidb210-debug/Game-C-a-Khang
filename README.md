@@ -14,8 +14,7 @@ Bạn có thể tải repo này về và mở file **index.html** với trình d
 * Cài đặt thủ công:
 ```<> Code → Local → Download ZIP```
 * Cài đặt với git:
-  - Main:
-    ```git clone https://github.com/khangnguyenidb210-debug/Game-C-a-Khang.git```
+```git clone https://github.com/khangnguyenidb210-debug/Game-C-a-Khang.git```
 
 Hoặc có thể thử trực tiếp tại [đây](https://khangnguyenidb210-debug.github.io/Game-C-a-Khang/) (nhánh main).
 
