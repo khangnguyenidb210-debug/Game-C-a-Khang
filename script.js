@@ -456,9 +456,9 @@ function useU() {
         // After 2s, Thoai gets 2x speed for 3s
         setTimeout(() => {
             player.isThoaiBoosted = true;
-            player.thoaiBoostedEnd = Date.now() + 3000;
+            player.thoaiBoostedEnd = now + 5000;
             spawnShockwave(player.x, player.y, '#22c55e');
-            playSound('assets/afterragebait.mp3', 0.7);
+            playSound('assets/afterragebait.mp3', 0.65);
         }, 2000);
     }
     uCD = now + COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1);
@@ -513,8 +513,8 @@ function useI() {
             bots = [];
         }
     } else if (selectedChar === 'thoai') {
-        // NGẮN THỌT: 60% hunter 3s, 40% penalty 0.5x speed 3s
-        const lucky = Math.random() < 0.6;
+        // NGẮN THỌT: 70% hunter 3s, 30% penalty 0.5x speed 3s
+        const lucky = Math.random() < 0.65;
         if (lucky) {
             player.isThoaiHunter = true;
             player.thoaiHunterEnd = now + 3000;
@@ -530,6 +530,17 @@ function useI() {
             shakeAmount = 15;
             spawnShockwave(player.x, player.y, '#94a3b8');
         }
+        const nganthot = document.getElementById('nganthot-flash');
+        nganthot.classList.remove('hidden');
+        nganthot.style.opacity = 1;
+        setTimeout(() => {
+            nganthot.style.transition = 'opacity 0.7s ease-out';
+            nganthot.style.opacity = 0;
+        }, 300);
+        setTimeout(() => {
+            nganthot.classList.add('hidden');
+            nganthot.style.transition = 'none';
+        }, 600);
         playSound('assets/motcaichettruyenthong.mp3', 0.67);
     }
     iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1);
@@ -760,10 +771,8 @@ function update() {
         if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.6);
         if (player.isSlowed && now < player.slowEnd) mult *= 0.25;
         if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) mult *= 2.0;
-        if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) {
+        if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd)
             mult *= (1.0 + player.tanUltKills * 0.25);
-            mult = Math.Min(mult, 2.5);
-        }
         if (selectedChar === 'thoai' && player.isThoaiBoosted && now < player.thoaiBoostedEnd) mult *= 2.0;
         if (selectedChar === 'thoai' && player.isThoaiPenalty && now < player.thoaiPenaltyEnd) mult *= 0.5;
     }
@@ -889,7 +898,7 @@ function update() {
                 }, 600);
                 // play custom parry sfx in assets
                 playSound('assets/parry.mp3');
-            } else if (!player.isGhost && freezeEnd < now && (!player.isInvincible || now > player.invincibleEnd)) {
+            } else if (!player.isGhost && freezeEnd < now && !player.isInvincible && !player.isTanGod) {
                 endGame(false, selectedBot);
                 playSound('assets/kill.mp3');
             }
