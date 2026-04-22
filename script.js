@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.0.1 (build 5)";
+const version = "1.1";
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
@@ -43,9 +43,9 @@ var frameTime = 0, lastLoop = new Date, thisLoop;
 
 const COOLDOWNS = {
     khang: { y: 3500, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 7500, u: 10000, i: 10000, o: 18000 },
+    dang: { y: 7500, u: 10000, i: 10000, o: 20000 },
     loi: { y: 6000, u: 12000, i: 5000, o: 18000 },
-    tan:  { y: 5000, u: 5000, i: 5000, o: 5000 }, // dev character
+    tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
     thoai: { y: 6000, u: 7000, i: 11000, o: 20000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
@@ -214,7 +214,7 @@ function checkCollision(x, y, ignoreWalls = false) {
 function resolveWallStick() {
     if (checkCollision(player.x, player.y)) {
         const dirs = [[0.1, 0], [-0.1, 0], [0, 0.1], [0, -0.1]];
-        for (let dist = 0.1; dist < 1.5; dist += 0.1) {
+        for (let dist = 0.1; dist < 1.7; dist += 0.1) {
             for (let [dx, dy] of dirs) {
                 if (!checkCollision(player.x + dx * dist, player.y + dy * dist)) {
                     player.x += dx * dist;
@@ -553,8 +553,8 @@ function useO() {
     if (selectedChar === 'dang') {
         player.isUlt = true;
         player.isGhost = true;
-        player.ultEnd = now + 3000;
-        player.ghostEnd = now + 3000;
+        player.ultEnd = now + 4500;
+        player.ghostEnd = now + 4500;
         playSound('assets/weave.mp3');
         for (let i = 0; i < 6; i++) {
             setTimeout(() => {
@@ -642,12 +642,11 @@ function update() {
     const isCommonRage = isRageable && elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
     // BOT Specialty Logic
     // Queen delays the player for 3 seconds
-    if (selectedBot === 'quyen' && !player.isDelayed && elapsed > 5000 && (elapsed % (10000 + 1500 * (currentLevel-1))) < 50) {
+    if (selectedBot === 'quyen' && !player.isDelayed && elapsed > 5000 && (elapsed % (10000 + 1500 * currentLevel)) < 50) {
         player.isDelayed = true;
         player.delayEnd = now + 3000;
         document.getElementById('warning-flash').classList.add('delay-warning');
         playSound('assets/delaying.mp3', 0.9);
-        playSfx(450, 'square', 0.5);
     }
 
     if (now > player.delayEnd) {
@@ -683,7 +682,7 @@ function update() {
         const luomDur = (isHard ? 75 : 50) + (isCommonRage ? (isHard ? 12 : 6) * currentLevel : 0);
         if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0) {
             isLuomCanMove = true;
-            playSound('assets/ruler-slap.mp3', 0.175);
+            playSound('assets/ruler-slap.mp3', 0.15);
         }
     }
 
@@ -756,7 +755,7 @@ function update() {
     }
 
     // PLAYER MOVE
-    let baseSpd = isHard ? 0.135 : 0.065 + ((isHard ? 0.0675 : 0.0125) * currentLevel);
+    let baseSpd = isHard ? 0.1325 : 0.07 + ((isHard ? 0.0675 : 0.0125) * currentLevel);
     let mult = 1;
     if (player.isDelayed) mult = 0;
     else if (player.isParrying) mult = 0.015;
@@ -799,7 +798,7 @@ function update() {
     resolveWallStick();
 
     // BOT MOVE
-    let bSpdBase = (isHard ? 0.09 : 0.065) + (currentLevel * 0.015);
+    let bSpdBase = (isHard ? 0.09 : 0.065) + (currentLevel * (isHard ? 0.0125 : 0.01));
     if (selectedBot === 'tin') bSpdBase *= (isHard ? 2.0 : 1.75);
     if (selectedBot === 'luom') bSpdBase = (isLuomCanMove ? (isHard ? 1.25 : 1.1) : 0);
     if ((selectedBot === 'quyen' || selectedBot === 'anh') && isHard) bSpdBase *= 1.5;
@@ -909,7 +908,7 @@ function update() {
     // BLACK HOLE update (Thoai [O])
     blackholes = blackholes.filter(bh => now < bh.lifeEnd);
     blackholes.forEach(bh => {
-        bh.radius = Math.min(bh.radius + 0.15, 5);
+        bh.radius = Math.min(bh.radius + 0.175, 5);
         bots.forEach(b => {
             const dx = bh.x - b.x, dy = bh.y - b.y;
             const d = Math.sqrt(dx * dx + dy * dy);
@@ -943,10 +942,10 @@ function update() {
             startTime = now;
             player.x = 1.5;
             player.y = 1.5;
-            yCD = Math.max(yCD - COOLDOWNS[selectedChar].y * (selectedBot === 'anh' ? 1.5 : 1) / 1.5, now);
-            uCD = Math.max(uCD - COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1) / 1.5, now);
-            iCD = Math.max(iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 1.5, now);
-            oCD = Math.max(oCD - COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1) / 1.5, now);
+            yCD = yCD - COOLDOWNS[selectedChar].y * (selectedBot === 'anh' ? 1.5 : 1) / 1.25;
+            uCD = uCD - COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1) / 1.25;
+            iCD = iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 1.25;
+            oCD = oCD - COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1) / 1.25;
             playSfx(500, 'sine', 0.5, 0.2, 1200);
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
