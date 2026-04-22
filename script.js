@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.0.1 (build 5)";
+const version = "1.1";
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
