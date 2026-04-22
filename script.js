@@ -637,7 +637,7 @@ function update() {
     const isHard = gameMode === 'hard';
     const isRageable = (selectedBot !== 'anh');
     // BOT STATES
-    const rageCycle = 15000 - (selectedBot === 'luom' ? 5000 : 0) - (isHard ? 2500 : 0);
+    const rageCycle = 15000 - (selectedBot === 'luom' ? 2500 : 0) - (isHard ? 2500 : 0);
     const rageDuration = 5000;
     const isCommonRage = isRageable && elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
     // BOT Specialty Logic
