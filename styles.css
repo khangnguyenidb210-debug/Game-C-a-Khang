@@ -118,6 +118,19 @@ body {
     }
 }
 
+.slow-warning {
+    animation: pulse-purple 0.4s infinite alternate;
+}
+
+@keyframes pulse-purple {
+    from {
+        background: transparent;
+    }
+    to {
+        background: rgba(168, 85, 247, 0.35);
+    }
+}
+
 ::-webkit-scrollbar {
     width: 8px;
 }
@@ -133,4 +146,31 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #334155;
+}
+
+.sharingan-warning {
+    animation: pulse-sharingan 0.25s infinite alternate;
+}
+
+@keyframes pulse-sharingan {
+    from { background: transparent; }
+    to   { background: rgba(220, 38, 38, 0.28); }
+}
+
+.god-mode-warning {
+    animation: pulse-gold 0.3s infinite alternate;
+}
+
+@keyframes pulse-gold {
+    from { background: transparent; }
+    to   { background: rgba(250, 204, 21, 0.18); }
+}
+
+.hunter-warning {
+    animation: pulse-hunter 0.2s infinite alternate;
+}
+
+@keyframes pulse-hunter {
+    from { background: transparent; }
+    to   { background: rgba(239, 68, 68, 0.22); }
 }
