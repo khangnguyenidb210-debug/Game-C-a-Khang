@@ -52,7 +52,7 @@ const COOLDOWNS = {
     loi: { y: 6000, u: 12000, i: 5000, o: 18000 },
     tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
     thoai: { y: 6000, u: 7000, i: 11000, o: 25000 },
-    quang: { y: 8000, u: 14000, i: 25000, o: 30000 }
+    quang: { y: 10000, u: 14000, i: 25000, o: 25000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -1029,7 +1029,7 @@ function update() {
         for (let dy = -1; dy <= 1; dy++) {
             for (let dx2 = -1; dx2 <= 1; dx2++) {
                 const tx = px + dx2, ty = py + dy;
-                if (tx > 0 && tx < COLS - 1 && ty > 0 && ty < ROWS - 1 && maze[ty][tx] === '#') {
+                if (tx > 0 && tx < COLS - 1 && ty > 0 && ty < ROWS - 1 && (maze[ty][tx] === '#' || maze[ty][tx] === 'a')) {
                     maze[ty][tx] = '.';
                 }
             }
