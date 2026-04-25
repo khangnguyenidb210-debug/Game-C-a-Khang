@@ -20,11 +20,6 @@ Hoặc có thể thử trực tiếp tại [đây](https://khangnguyenidb210-deb
 
 # **Cách chơi**
 Trốn thoát khỏi mê cung trước khi giáo viên bắt được bạn, dùng các kĩ năng có sẵn để sống sót!
-Di chuyển: W-A-S-D (trên, trái, dưới, phải)
-Kĩ năng: Y-U-I-O (chiêu 1/2/3, util)
-
-# **Cách chơi**
-Trốn thoát khỏi mê cung trước khi giáo viên bắt được bạn, dùng các kĩ năng có sẵn để sống sót!
 - Di chuyển: W-A-S-D (trên, trái, dưới, phải)
 - Kĩ năng: Y-U-I-O (chiêu 1/2/3, ulti)
 
