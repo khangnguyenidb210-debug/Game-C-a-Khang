@@ -1,5 +1,60 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;700&display=swap');
 
+/* Wobble Thingy */
+
+.wobble {
+  animation: wobble 1s ease-in-out infinite;
+}
+
+@keyframes wobble {
+  0% { transform: translateX(0%) rotate(0deg); }
+  15% { transform: translateX(-25%) rotate(-10deg); }
+  30% { transform: translateX(20%) rotate(6deg); }
+  45% { transform: translateX(-15%) rotate(-6deg); }
+  60% { transform: translateX(10%) rotate(4deg); }
+  75% { transform: translateX(-5%) rotate(-2deg); }
+  100% { transform: translateX(0%) rotate(0deg); }
+}
+
+/* Character Display Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.char-display {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Character Tab Styles */
+.char-tab {
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.char-tab:hover {
+    transform: scale(1.1);
+}
+
+/* Skill Text Styles */
+.skill-text {
+    font-size: 14px;
+    color: #94a3b8;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.skill-text:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
 body {
     margin: 0;
     background-color: #020617;

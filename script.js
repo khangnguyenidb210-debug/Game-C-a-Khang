@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.1";
+const version = "1.2 (preview, build 1)";
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
@@ -17,16 +17,21 @@ let player = {
     isParrying: false, parryEnd: 0,
     isInvincible: false, invincibleEnd: 0,
     isParrySuccess: false,
-    isSlowed: false, slowEnd: 0,
+    isSuperSlow: false, superSlowEnd: 0,
+    isSlow: false, slowEnd: 0,
     isTanGod: false, tanGodEnd: 0,
     isTanSharingan: false, tanSharinganEnd: 0,
     isTanUlt: false, tanUltEnd: 0,
     countKills: 0,
     // Thoai skills
-    isThoaiSlow: false, thoaiSlowEnd: 0,       // [Y] bots slowed
+    isThoaiSlow: false, thoaisuperSlowEnd: 0,       // [Y] bots slowed
     isThoaiBoosted: false, thoaiBoostedEnd: 0,  // [U] Thoai speed boost after rage bait
     isThoaiHunter: false, thoaiHunterEnd: 0,    // [I] lucky hunter
-    isThoaiPenalty: false, thoaiPenaltyEnd: 0   // [I] unlucky slow
+    isThoaiPenalty: false, thoaiPenaltyEnd: 0,   // [I] unlucky slow
+    // Quang skills
+    isQuangJumping: false, quangJumpEnd: 0, // [O] earthquake jump
+    isQuangGravity: false, quangGravityEnd: 0,   // [U] gravity field
+    isQuangBotSlowed: false, quangBotsuperSlowEnd: 0  // [I/O] bot slow after explosion
 };
 
 let bots = [], particles = [], decoys = [], trails = [], shockwaves = [], traps = [], blackholes = [];
@@ -43,10 +48,11 @@ var frameTime = 0, lastLoop = new Date, thisLoop;
 
 const COOLDOWNS = {
     khang: { y: 3500, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 7500, u: 10000, i: 10000, o: 20000 },
+    dang: { y: 7500, u: 10000, i: 12000, o: 18000 },
     loi: { y: 6000, u: 12000, i: 5000, o: 18000 },
     tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
-    thoai: { y: 6000, u: 7000, i: 11000, o: 20000 }
+    thoai: { y: 6000, u: 7000, i: 11000, o: 25000 },
+    quang: { y: 8000, u: 14000, i: 25000, o: 35000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -74,11 +80,11 @@ function shiftTimers(delta) {
     player.delayEnd += delta;
     player.parryEnd += delta;
     player.invincibleEnd += delta;
-    player.slowEnd += delta;
+    player.superSlowEnd += delta;
     player.tanGodEnd += delta;
     player.tanSharinganEnd += delta;
     player.tanUltEnd += delta;
-    player.thoaiSlowEnd += delta;
+    player.thoaisuperSlowEnd += delta;
     player.thoaiBoostedEnd += delta;
     player.thoaiHunterEnd += delta;
     player.thoaiPenaltyEnd += delta;
@@ -204,7 +210,8 @@ function checkCollision(x, y, ignoreWalls = false) {
     const l = Math.floor(x - h), r = Math.floor(x + h), t = Math.floor(y - h), b = Math.floor(y + h);
     for (let i = t; i <= b; i++) {
         for (let j = l; j <= r; j++) {
-            if (i < 0 || i >= ROWS || j < 0 || j >= COLS) return true;
+            if (i <= 0 || i >= ROWS - 1 || j <= 0 || j >= COLS - 1) return true;
+            if (player.isQuangJumping && Date.now() < player.quangJumpEnd) return false;
             if (!ignoreWalls && (maze[i][j] === '#' || maze[i][j] === 'a')) return true;
         }
     }
@@ -328,7 +335,7 @@ function useY() {
     } else if (selectedChar === 'thoai') {
         // MÌ TÔM BÒ KHÔ RADIO: slow all bots to 0.25x for 3s
         player.isThoaiSlow = true;
-        player.thoaiSlowEnd = now + 3000;
+        player.thoaisuperSlowEnd = now + 3000;
         bots.forEach(b => { b.thoaiSlowUntil = now + 3000; });
         shakeAmount = 10;
         spawnShockwave(player.x, player.y, '#a78bfa');
@@ -348,6 +355,21 @@ function useY() {
         }, 600);
         playSound('assets/mitombokhoradio.mp3', 0.67);
         yCD = now + COOLDOWNS.thoai.y * (selectedBot === 'anh' ? 1.5 : 1);
+    } else if (selectedChar === 'quang') {
+        // EARTHQUAKE: shake camera, delay bots 3s, then 0.25x speed for 2s
+        shakeAmount = 35;
+        for (let i = 0; i < 10; i++) {
+            setTimeout(() => {
+                shakeAmount = Math.max(shakeAmount, 20);
+                spawnShockwave(player.x, player.y, i % 2 ? '#a16207' : '#78350f');
+            }, i * 150);
+        }
+        playSfx(60, 'sawtooth', 0.6, 0.3, 30);
+        bots.forEach(b => {
+            b.delayUntil = now + 3000;
+            b.quangEarthquakeSlowUntil = now + 5000;
+        });
+        yCD = now + COOLDOWNS.quang.y * (selectedBot === 'anh' ? 1.5 : 1);
     }
 }
 
@@ -361,23 +383,20 @@ function useU() {
         playSound('assets/timestop.mp3', 1.0);
     } else if (selectedChar === 'dang') {
         let isPunchSuccess = false;
-        player.countKills = 0;
         bots.forEach(b => {
             let dx = b.x - player.x, dy = b.y - player.y, d = Math.sqrt(dx * dx + dy * dy);
-            if (d < 5) {
-                b.x += (dx / d) * 4;
-                b.y += (dy / d) * 4;
-                b.delayUntil = now + 3000;
-                b.isDead = true;
-                player.countKills++;
+            if (d < 4) {
+                b.x += (dx / d) * 3;
+                b.y += (dy / d) * 3;
+                b.delayUntil = now + 2500;
                 isPunchSuccess = true;
             }
         });
         bots = bots.filter(b => !b.isDead);
         bots.forEach(b => {
             if (checkCollision(b.x, b.y)) {
-                let dirs = [[0.1, 0], [-0.1, 0], [0, 0.1], [0, -0.1]];
-                for (let dist = 0.1; dist < 2; dist += 0.1) {
+                let dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
+                for (let dist = 0.1; dist < 4; dist += 0.1) {
                     for (let [dx, dy] of dirs) {
                         if (!checkCollision(b.x + dx * dist, b.y + dy * dist)) {
                             b.x += dx * dist;
@@ -399,7 +418,7 @@ function useU() {
             }
         }
         if (isPunchSuccess) {
-            spawnShockwave(player.x, player.y, 'rgba(16, 219, 255, 0.8)');
+            spawnShockwave(player.x, player.y, 'rgba(255, 255, 255, 0.8)');
             playSound('assets/punchsucess.mp3', 0.5);
         } else playSound('assets/missing.mp3', 0.8)
 
@@ -460,6 +479,25 @@ function useU() {
             spawnShockwave(player.x, player.y, '#22c55e');
             playSound('assets/afterragebait.mp3', 0.65);
         }, 2000);
+    } else if (selectedChar === 'quang') {
+        // GRAVITY FIELD: player slowed 0.5x for 2s, bots frozen 5s (gravitational pull effect)
+        player.isSuperSlow = true;
+        player.superSlowEnd = now + 2000;
+        player.isQuangGravity = true;
+        player.quangGravityEnd = now + 5000;
+        // Pull all bots toward player center (gravitational effect)
+        bots.forEach(b => {
+            b.delayUntil = now + 5000;
+            b.quangGravityUntil = now + 5000;
+        });
+        // Spawn pulsing purple shockwaves
+        for (let i = 0; i < 14; i++) {
+            setTimeout(() => {
+                spawnShockwave(player.x, player.y, i % 2 ? '#7e22ce' : '#c084fc');
+                if (i < 6) shakeAmount = Math.max(shakeAmount, 15);
+            }, i * 200);
+        }
+        playSfx(80, 'sine', 0.5, 0.35, 40);
     }
     uCD = now + COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1);
 }
@@ -492,8 +530,10 @@ function useI() {
         playSfx(700, 'sine', 0.3);
     } else if (selectedChar === 'dang') {
         player.parryEnd = now + 1250;
+        player.invincibleEnd = now + 1250;
         player.isParrying = true;
-        playSfx(1000, 'triangle', 0.4);
+        player.isInvincible = true;
+        playSound('assets/epic-twinkle.mp3', 0.8);
         spawnShockwave(player.x, player.y, '#cecece');
     } else if (selectedChar === 'loi') {
         decoys.push({ x: player.x, y: player.y, lifeEnd: now + 8000 });
@@ -542,6 +582,20 @@ function useI() {
             nganthot.style.transition = 'none';
         }, 600);
         playSound('assets/motcaichettruyenthong.mp3', 0.67);
+    } else if (selectedChar === 'quang') {
+        blackholes.push({
+            x: player.x,
+            y: player.y,
+            lifeEnd: now + 3000,
+            radius: 0,
+            isMega: true,
+            exploded: false
+        });
+        shakeAmount = 45;
+        for (let i = 0; i < 18; i++) {
+            setTimeout(() => spawnShockwave(player.x, player.y, i % 3 === 0 ? '#000' : (i % 3 === 1 ? '#4c1d95' : '#7c3aed')), i * 60);
+        }
+        playSound('assets/black-hole.mp3', 1.0);
     }
     iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1);
 }
@@ -581,8 +635,8 @@ function useO() {
         });
         bots.forEach(b => {
             if (checkCollision(b.x, b.y)) {
-                let dirs = [[0.1, 0], [-0.1, 0], [0, 0.1], [0, -0.1]];
-                for (let dist = 0.1; dist < 2; dist += 0.1) {
+                let dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
+                for (let dist = 0.1; dist < 4; dist += 0.1) {
                     for (let [dx, dy] of dirs) {
                         if (!checkCollision(b.x + dx * dist, b.y + dy * dist)) {
                             b.x += dx * dist;
@@ -614,14 +668,25 @@ function useO() {
         blackholes.push({
             x: player.x,
             y: player.y,
-            lifeEnd: now + 3000,
+            lifeEnd: now + 5000,
             radius: 0
         });
-        shakeAmount = 35;
+        shakeAmount = 40;
         for (let i = 0; i < 12; i++) {
             setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#000' : '#7c3aed'), i * 60);
         }
         playSound('assets/black-hole.mp3', 0.67);
+    } else if (selectedChar === 'quang') {
+        // EARTHQUAKE JUMP: jump and destroy 3x3 blocks when landing
+        player.isQuangJumping = true;
+        player.quangJumpEnd = now + 1000;
+        player.isInvincible = true;
+        player.invincibleEnd = now + 1000;
+        playSound('assets/wee.mp3', 0.8);
+        setTimeout(() => {
+            player.isSlow = true;
+            player.slowEnd = now + 700;
+        }, 150);
     }
     oCD = now + COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1);
 }
@@ -637,7 +702,7 @@ function update() {
     const isHard = gameMode === 'hard';
     const isRageable = (selectedBot !== 'anh');
     // BOT STATES
-    const rageCycle = 15000 - (selectedBot === 'luom' ? 2500 : 0) - (isHard ? 2500 : 0);
+    const rageCycle = 15000 - (selectedBot === 'luom' ? 5000 : 0) - (isHard ? 2000 : 0);
     const rageDuration = 5000;
     const isCommonRage = isRageable && elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
     // BOT Specialty Logic
@@ -701,7 +766,7 @@ function update() {
         playAlarm();
     } else {
         isRaging = false;
-        if (player.isSlowed && now < player.slowEnd) {
+        if (selectedChar !== 'quang' && player.isSuperSlow && now < player.superSlowEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#c084fc';
             statusEl.innerText = "🐌 BỊ LÀM CHẬM! (0.25X TỐC ĐỘ)";
@@ -717,7 +782,7 @@ function update() {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#f97316';
             statusEl.innerText = `🔥 HUNTER MODE! KILLS: ${player.countKills} (+${player.countKills * 25}% SPD)`;
-        } else if (selectedChar === 'thoai' && player.isThoaiSlow && now < player.thoaiSlowEnd) {
+        } else if (selectedChar === 'thoai' && player.isThoaiSlow && now < player.thoaisuperSlowEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#a78bfa';
             statusEl.innerText = '📻 MÌ TÔM! (BOT 0.25X TỐC ĐỘ)';
@@ -733,6 +798,14 @@ function update() {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#94a3b8';
             statusEl.innerText = '💀 XUI XẺO! (0.5X TỐC ĐỘ)';
+        } else if (selectedChar === 'quang' && player.isQuangGravity && now < player.quangGravityEnd) {
+            statusEl.classList.remove('opacity-0');
+            statusEl.style.color = '#c084fc';
+            statusEl.innerText = `🌀 TRỌNG LỰC! (BOT ĐÓNG BĂNG)`;
+        } else if (selectedChar === 'quang' && player.isSuperSlow && now < player.superSlowEnd) {
+            statusEl.classList.remove('opacity-0');
+            statusEl.style.color = '#c084fc';
+            statusEl.innerText = '🐌 TRỌNG LỰC PHẢN (0.25X TỐC ĐỘ)';
         } else {
             statusEl.style.color = '';
             statusEl.classList.add('opacity-0');
@@ -755,7 +828,7 @@ function update() {
     }
 
     // PLAYER MOVE
-    let baseSpd = isHard ? 0.1325 : 0.07 + ((isHard ? 0.0675 : 0.0125) * currentLevel);
+    let baseSpd = isHard ? 0.135 : 0.065 + ((isHard ? 0.0675 : 0.0125) * currentLevel);
     let mult = 1;
     if (player.isDelayed) mult = 0;
     else if (player.isParrying) mult = 0.015;
@@ -768,7 +841,8 @@ function update() {
         if (player.isCoffee) mult *= 1.5;
         if (player.isMedalSpeed) mult *= 2.0;
         if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.6);
-        if (player.isSlowed && now < player.slowEnd) mult *= 0.25;
+        if (player.isSuperSlow && now < player.superSlowEnd) mult *= 0.25;
+        if (player.isSlow && now < player.slowEnd) mult *= 0.5;
         if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) mult *= 2.0;
         if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd)
             mult *= (1.0 + player.tanUltKills * 0.25);
@@ -807,10 +881,10 @@ function update() {
         if (b.x <= 0 || b.x > COLS - 1 || b.y <= 0 || b.y > ROWS - 1) {
             bots.splice(bots.indexOf(b), 1);
             // reduce player cooldowns
-            yCD = Math.max(yCD - COOLDOWNS[selectedChar].y * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
-            uCD = Math.max(uCD - COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
-            iCD = Math.max(iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
-            oCD = Math.max(oCD - COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
+            yCD = Math.max(yCD - COOLDOWNS[selectedChar].y * (selectedBot === 'anh' ? 1.5 : 1) / 1.25, now);
+            uCD = Math.max(uCD - COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1) / 1.25, now);
+            iCD = Math.max(iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 1.25, now);
+            oCD = Math.max(oCD - COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1) / 1.25, now);
             return;
         }
         const superEnraged = (now > b.superRageStart && now < b.superRageEnd) && isRageable;
@@ -819,6 +893,10 @@ function update() {
         else if (isCommonRage) finalBSpd *= 2.0;
         // Thoai [Y]: slow bots
         if (selectedChar === 'thoai' && b.thoaiSlowUntil && now < b.thoaiSlowUntil) finalBSpd *= 0.25;
+        // Quang [Y] earthquake slow (0.25x for 2s after 3s delay)
+        if (b.quangEarthquakeSlowUntil && now < b.quangEarthquakeSlowUntil && now >= (b.delayUntil || 0)) finalBSpd *= 0.25;
+        // Quang [U] gravity frozen (bots can't move)
+        if (b.quangGravityUntil && now < b.quangGravityUntil) finalBSpd = 0;
         if (isLuomCanMove){
             spawnTrail(b.x, b.y, '#ef4444');
         };
@@ -826,7 +904,7 @@ function update() {
             if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
                 b.delayUntil = now + (isHard ? 2500 : 3500);
                 spawnShockwave(t.x, t.y, '#fff');
-                playSound('assets/ahhhhhhhhhh.mp3', 0.4);
+                playSound('assets/ahhhhhhhhhh.mp3', 0.25);
                 traps.splice(idx, 1);
             }
         });
@@ -905,10 +983,27 @@ function update() {
     });
     bots = bots.filter(b => !b.isDead);
 
-    // BLACK HOLE update (Thoai [O])
-    blackholes = blackholes.filter(bh => now < bh.lifeEnd);
+    // BLACK HOLE update (Thoai [O] and Quang [I])
+    // Handle mega black hole explosion before filter
     blackholes.forEach(bh => {
-        bh.radius = Math.min(bh.radius + 0.175, 5);
+        if (bh.isMega && !bh.exploded && now >= bh.lifeEnd) {
+            bh.exploded = true;
+            // Explode: slow all bots 0.5x for 2s
+            bots.forEach(b => {
+                b.quangEarthquakeSlowUntil = now + 2000;
+            });
+            shakeAmount = 60;
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    spawnShockwave(bh.x, bh.y, i % 3 === 0 ? '#000' : (i % 3 === 1 ? '#4c1d95' : '#c084fc'));
+                }, i * 50);
+            }
+            playSfx(30, 'sawtooth', 1.0, 0.5, 15);
+        }
+    });
+    blackholes = blackholes.filter(bh => now < bh.lifeEnd + (bh.isMega ? 500 : 0) && !bh.exploded);
+    blackholes.forEach(bh => {
+        bh.radius = Math.min(bh.radius + (bh.isMega ? 0.25 : 0.15), bh.isMega ? 9 : 5);
         bots.forEach(b => {
             const dx = bh.x - b.x, dy = bh.y - b.y;
             const d = Math.sqrt(dx * dx + dy * dy);
@@ -926,8 +1021,44 @@ function update() {
         bots = bots.filter(b => !b.isDead);
     });
 
+    if (selectedChar === 'quang' && player.isQuangJumping && now >= player.quangJumpEnd) {
+        player.isQuangJumping = false;
+        // Break 3x3 blocks around player (turn walls into open paths)
+        const px = Math.floor(player.x), py = Math.floor(player.y);
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx2 = -1; dx2 <= 1; dx2++) {
+                const tx = px + dx2, ty = py + dy;
+                if (tx > 0 && tx < COLS - 1 && ty > 0 && ty < ROWS - 1 && maze[ty][tx] === '#') {
+                    maze[ty][tx] = '.';
+                }
+            }
+        }
+        shakeAmount = 250;
+        playSound('assets/landing.mp3', 0.85);
+        if (checkCollision(player.x, player.y)) {
+            let dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
+            for (let dist = 0.1; dist < 4; dist += 0.1) {
+                for (let [dx, dy] of dirs) {
+                    if (!checkCollision(player.x + dx * dist, player.y + dy * dist)) {
+                        player.x += dx * dist;
+                        player.y += dy * dist;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // QUANG GRAVITY VISUAL: pull bots toward player while gravity active
+    if (selectedChar === 'quang' && player.isQuangGravity && now < player.quangGravityEnd) {
+        // Spawn periodic purple gravity rings
+        if (Math.floor(now / 300) !== Math.floor((now - 16) / 300)) {
+            spawnShockwave(player.x, player.y, 'rgba(139,92,246,0.5)');
+        }
+    }
+
     // LEVELING
-    if (maze[Math.floor(player.y)][Math.floor(player.x)] === 'K') {
+    if (maze[Math.floor(player.y)][Math.floor(player.x)] === 'K' && !player.isQuangJumping) {
         if (currentLevel < 5) {
             player.isSpeedBoost = true;
             player.speedBoostEnd = 3000;
@@ -942,11 +1073,12 @@ function update() {
             startTime = now;
             player.x = 1.5;
             player.y = 1.5;
-            yCD = yCD - COOLDOWNS[selectedChar].y * (selectedBot === 'anh' ? 1.5 : 1) / 1.25;
-            uCD = uCD - COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1) / 1.25;
-            iCD = iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 1.25;
-            oCD = oCD - COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1) / 1.25;
-            playSfx(500, 'sine', 0.5, 0.2, 1200);
+            // reduce player CDs by 1.25
+            yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * 0.25);
+            uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * 0.25);
+            iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * 0.25);
+            oCD = Math.max(now, oCD - COOLDOWNS[selectedChar].o * 0.25);
+            playSound('assets/newlevel.mp3');
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
             endGame(true, selectedBot);
@@ -982,14 +1114,22 @@ function update() {
     if (now > player.tanGodEnd) player.isTanGod = false;
     if (now > player.tanSharinganEnd) player.isTanSharingan = false;
     if (now > player.tanUltEnd) player.isTanUlt = false;
-    if (now > player.thoaiSlowEnd) player.isThoaiSlow = false;
+    if (now > player.thoaisuperSlowEnd) player.isThoaiSlow = false;
     if (now > player.thoaiBoostedEnd) player.isThoaiBoosted = false;
     if (now > player.thoaiHunterEnd) { player.isThoaiHunter = false; player.isInvincible = false; }
     if (now > player.thoaiPenaltyEnd) player.isThoaiPenalty = false;
+    if (now > player.quangGravityEnd) player.isQuangGravity = false;
+    if (now > player.quangJumpEnd) player.isQuangJumping = false;
 
     if (player.isUlt) {
         let color = selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'khang' ? '#fff' : '#6366f1');
         spawnTrail(player.x, player.y, color);
+    }
+    if (selectedChar === 'quang' && player.isQuangJumping && now < player.quangJumpEnd) {
+        spawnTrail(player.x, player.y, 'rgba(251,191,36,0.7)');
+    }
+    if (selectedChar === 'quang' && player.isQuangGravity && now < player.quangGravityEnd) {
+        spawnTrail(player.x, player.y, 'rgba(139,92,246,0.6)');
     }
     decoys = decoys.filter(d => now < d.lifeEnd);
 
@@ -1007,6 +1147,14 @@ function update() {
  */
 function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false) {
     const size = (isBot ? 0.75 : 0.6) * TILE_SIZE;
+    if (!isBot && player.isParrying && Date.now() < player.parryEnd) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ffffff';
+        ctx.strokeRect(x * TILE_SIZE - size * 0.8, y * TILE_SIZE - size * 0.8, size * 1.6, size * 1.6);
+        ctx.shadowBlur = 0;
+    }
     if (!isBot && player.isShield && Date.now() < player.shieldEnd) {
         ctx.strokeStyle = '#fbbf24';
         ctx.lineWidth = 4;
@@ -1026,11 +1174,37 @@ function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false) {
         ctx.shadowColor = ctx.fillStyle;
     }
 
-    ctx.fillRect(x * TILE_SIZE - size / 2, y * TILE_SIZE - size / 2, size, size);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = (isBot && isEnraged) ? '#fff' : eyeColor;
-    ctx.fillRect(x * TILE_SIZE - size * 0.25, y * TILE_SIZE - size * 0.2, size * 0.2, size * 0.2);
-    ctx.fillRect(x * TILE_SIZE + size * 0.05, y * TILE_SIZE - size * 0.2, size * 0.2, size * 0.2);
+    if (!isBot && player.isQuangJumping && Date.now() < player.quangJumpEnd){
+        // draw bigger entity + shadow on the ground
+        const jumpSize = size * 1.8;
+        const jumpY = y * TILE_SIZE + TILE_SIZE * 0.3;
+        
+        // Shadow on the ground (ellipse)
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.beginPath();
+        ctx.ellipse(x * TILE_SIZE, y * TILE_SIZE + TILE_SIZE * 0.35, jumpSize * 0.4, jumpSize * 0.15, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        
+        // Bigger entity in the air
+        ctx.fillStyle = color;
+        ctx.shadowBlur = 25;
+        ctx.shadowColor = '#fbbf24';
+        ctx.fillRect(x * TILE_SIZE - jumpSize / 2, y * TILE_SIZE - jumpSize / 2 - TILE_SIZE * 0.3, jumpSize, jumpSize);
+        ctx.shadowBlur = 0;
+        
+        // Eyes (slightly higher due to jump)
+        ctx.fillStyle = eyeColor;
+        ctx.fillRect(x * TILE_SIZE - jumpSize * 0.25, y * TILE_SIZE - jumpSize * 0.2 - TILE_SIZE * 0.3, jumpSize * 0.2, jumpSize * 0.2);
+        ctx.fillRect(x * TILE_SIZE + jumpSize * 0.05, y * TILE_SIZE - jumpSize * 0.2 - TILE_SIZE * 0.3, jumpSize * 0.2, jumpSize * 0.2);
+    } else {
+        ctx.fillRect(x * TILE_SIZE - size / 2, y * TILE_SIZE - size / 2, size, size);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = (isBot && isEnraged) ? '#fff' : eyeColor;
+        ctx.fillRect(x * TILE_SIZE - size * 0.25, y * TILE_SIZE - size * 0.2, size * 0.2, size * 0.2);
+        ctx.fillRect(x * TILE_SIZE + size * 0.05, y * TILE_SIZE - size * 0.2, size * 0.2, size * 0.2);
+    }
 }
 
 function draw(inRage) {
@@ -1072,35 +1246,48 @@ function draw(inRage) {
         ctx.shadowBlur = 0;
     });
 
-    // Draw black holes (Thoai [O])
+    // Draw black holes (Thoai [O] and Quang [I] mega)
     const nowDraw = Date.now();
     blackholes.forEach(bh => {
         const cx = bh.x * TILE_SIZE, cy = bh.y * TILE_SIZE;
-        const pulse = 0.7 + 0.3 * Math.sin(nowDraw / 120);
+        const pulse = 0.7 + 0.3 * Math.sin(nowDraw / (bh.isMega ? 80 : 120));
+        const innerColor = bh.isMega ? 'rgba(76,29,149,0.95)' : 'rgba(124,58,237,0.9)';
+        const glowColor = bh.isMega ? '#1e1b4b' : '#7c3aed';
+        const ringColor = bh.isMega ? `rgba(109, 40, 217, ${0.5 + 0.3 * pulse})` : `rgba(167, 139, 250, ${0.4 + 0.3 * pulse})`;
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, bh.radius * TILE_SIZE);
-        grad.addColorStop(0, 'rgba(124,58,237,0.9)');
+        grad.addColorStop(0, innerColor);
         grad.addColorStop(0.4, 'rgba(0,0,0,0.85)');
         grad.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.beginPath();
-        ctx.arc(cx, cy, Math.max(bh.radius * TILE_SIZE, TILE_SIZE * 0.5), 0, Math.PI * 2);
+        ctx.arc(cx, cy, Math.max(bh.radius * TILE_SIZE, TILE_SIZE * (bh.isMega ? 0.8 : 0.5)), 0, Math.PI * 2);
         ctx.fillStyle = grad;
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(cx, cy, TILE_SIZE * 0.35 * pulse, 0, Math.PI * 2);
+        ctx.arc(cx, cy, TILE_SIZE * (bh.isMega ? 0.5 : 0.35) * pulse, 0, Math.PI * 2);
         ctx.fillStyle = '#000';
-        ctx.shadowBlur = 30;
-        ctx.shadowColor = '#7c3aed';
+        ctx.shadowBlur = bh.isMega ? 60 : 30;
+        ctx.shadowColor = glowColor;
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.rotate(nowDraw / 300);
-        ctx.strokeStyle = `rgba(167, 139, 250, ${0.4 + 0.3 * pulse})`;
-        ctx.lineWidth = 2;
+        ctx.rotate(nowDraw / (bh.isMega ? 180 : 300));
+        ctx.strokeStyle = ringColor;
+        ctx.lineWidth = bh.isMega ? 4 : 2;
         ctx.setLineDash([4, 6]);
         ctx.beginPath();
-        ctx.arc(0, 0, TILE_SIZE * 0.6, 0, Math.PI * 2);
+        ctx.arc(0, 0, TILE_SIZE * (bh.isMega ? 1.0 : 0.6), 0, Math.PI * 2);
         ctx.stroke();
+        if (bh.isMega) {
+            // Extra outer ring for mega
+            ctx.rotate(-nowDraw / 220);
+            ctx.strokeStyle = `rgba(139,92,246,${0.3 * pulse})`;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 8]);
+            ctx.beginPath();
+            ctx.arc(0, 0, TILE_SIZE * 1.6, 0, Math.PI * 2);
+            ctx.stroke();
+        }
         ctx.setLineDash([]);
         ctx.restore();
     });
@@ -1138,7 +1325,7 @@ function draw(inRage) {
     });
     ctx.globalAlpha = 1;
 
-    let pCol = selectedChar === 'khang' ? '#22c55e' : (selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'loi' ? '#6366f1' : (selectedChar === 'thoai' ? '#a78bfa' : '#f97316')));
+    let pCol = selectedChar === 'khang' ? '#22c55e' : (selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'loi' ? '#6366f1' : (selectedChar === 'thoai' ? '#a78bfa' : (selectedChar === 'quang' ? '#d97706' : '#f97316'))));
     if (player.isUlt && selectedChar === 'dang') pCol = '#fbbf24';
     if (player.isDelayed) pCol = '#475569';
     if (player.isParrying) pCol = '#7ec8d5';
@@ -1148,10 +1335,19 @@ function draw(inRage) {
     if (selectedChar === 'thoai' && player.isThoaiHunter && Date.now() < player.thoaiHunterEnd) pCol = '#facc15';
     if (selectedChar === 'thoai' && player.isThoaiBoosted && Date.now() < player.thoaiBoostedEnd) pCol = '#22c55e';
     if (selectedChar === 'thoai' && player.isThoaiPenalty && Date.now() < player.thoaiPenaltyEnd) pCol = '#475569';
+    if (selectedChar === 'quang' && player.isQuangGravity && Date.now() < player.quangGravityEnd) pCol = '#c084fc';
+    if (selectedChar === 'quang' && player.isQuangJumping && Date.now() < player.quangJumpEnd) pCol = '#fbbf24';
     if (selectedChar === 'tan' && player.isTanSharingan && Date.now() < player.tanSharinganEnd) {
         // Sharingan: tint the whole canvas red
         ctx.save();
         ctx.fillStyle = 'rgba(180, 0, 0, 0.25)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+    }
+    if (selectedChar === 'quang' && player.isQuangGravity && Date.now() < player.quangGravityEnd) {
+        // Gravity: tint the whole canvas purple
+        ctx.save();
+        ctx.fillStyle = 'rgba(88, 28, 135, 0.18)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
     }
@@ -1236,15 +1432,19 @@ function resetGameState() {
         isInvincible: false, invincibleEnd: 0,
         isSpeedBoost: true, speedBoostEnd: 3000,
         isParrySuccess: false,
-        isSlowed: false, slowEnd: 0,
+        isSuperSlow: false, superSlowEnd: 0,
+        isSlow: false, slowEnd: 0,
         isTanGod: false, tanGodEnd: 0,
         isTanSharingan: false, tanSharinganEnd: 0,
         isTanUlt: false, tanUltEnd: 0,
         countKills: 0,
-        isThoaiSlow: false, thoaiSlowEnd: 0,
+        isThoaiSlow: false, thoaisuperSlowEnd: 0,
         isThoaiBoosted: false, thoaiBoostedEnd: 0,
         isThoaiHunter: false, thoaiHunterEnd: 0,
-        isThoaiPenalty: false, thoaiPenaltyEnd: 0
+        isThoaiPenalty: false, thoaiPenaltyEnd: 0,
+        isQuangJumping: false, quangJumpEnd: 0,
+        isQuangGravity: false, quangGravityEnd: 0,
+        isQuangBotSlowed: false, quangBotsuperSlowEnd: 0
     };
     document.getElementById('warning-flash').classList.remove('delay-warning');
     document.getElementById('warning-flash').classList.remove('slow-warning');
@@ -1275,14 +1475,57 @@ function returnToGame() {
 
 window.selectChar = (c) => {
     selectedChar = c;
-    const colors = { khang: '#22c55e', dang: '#06b6d4', loi: '#6366f1', tan: '#f97316', thoai: '#a78bfa' };
-    ['khang', 'dang', 'loi', 'tan', 'thoai'].forEach(id => {
-        const el = document.getElementById('char-' + id);
-        if (!el) return;
-        el.style.borderColor = (id === c ? colors[id] : '#1e293b');
-        el.style.backgroundColor = (id === c ? 'rgba(255,255,255,0.05)' : 'transparent');
+    const colors = { khang: '#22c55e', dang: '#06b6d4', loi: '#6366f1', tan: '#f97316', thoai: '#a78bfa', quang: '#d97706' };
+    const charOrder = ['khang', 'dang', 'loi', 'tan', 'thoai', 'quang'];
+    
+    // Update tab buttons
+    charOrder.forEach((id, index) => {
+        const tab = document.querySelector(`#char-tabs button[onclick="selectChar('${id}')"]`);
+        if (!tab) return;
+        if (id === c) {
+            tab.classList.remove('border-slate-700');
+            tab.classList.add(`border-${id === 'khang' ? 'green-400' : id === 'dang' ? 'cyan-400' : id === 'loi' ? 'indigo-400' : id === 'tan' ? 'orange-400' : id === 'thoai' ? 'violet-300' : 'amber-500'}`);
+            tab.style.transform = 'scale(1.25)';
+            tab.style.padding = '3px';
+            tab.style.boxShadow = `0 0 25px ${colors[id]}`;
+        } else {
+            tab.classList.add('border-slate-700');
+            tab.classList.remove('border-green-400', 'border-cyan-400', 'border-indigo-400', 'border-orange-400', 'border-violet-300', 'border-amber-500');
+            tab.style.transform = 'scale(1)';
+            tab.style.padding = '0px';
+            tab.style.boxShadow = 'none';
+        }
+    });
+    
+    // Update character display
+    charOrder.forEach(id => {
+        const display = document.getElementById('char-display-' + id);
+        if (display) {
+            if (id === c) {
+                display.classList.remove('hidden');
+                display.classList.add('block');
+                display.style.animation = 'fadeIn 0.3s ease-out, wobble 0.6s';
+            } else {
+                display.classList.add('hidden');
+                display.classList.remove('block');
+            }
+        }
     });
 };
+
+window.changeCharTab = (dir) => {
+    const charOrder = ['khang', 'dang', 'loi', 'tan', 'thoai', 'quang'];
+    const currentIndex = charOrder.indexOf(selectedChar);
+    let newIndex = currentIndex + dir;
+    if (newIndex < 0) newIndex = charOrder.length - 1;
+    if (newIndex >= charOrder.length) newIndex = 0;
+    selectChar(charOrder[newIndex]);
+};
+
+// Initialize character display on load
+window.addEventListener('DOMContentLoaded', () => {
+    selectChar('khang');
+});
 
 window.selectMode = (m) => {
     gameMode = m;
