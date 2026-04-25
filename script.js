@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 1)";
+const version = "1.2 (preview, build 2)";
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
@@ -47,12 +47,12 @@ var filterStrength = 20;
 var frameTime = 0, lastLoop = new Date, thisLoop;
 
 const COOLDOWNS = {
-    khang: { y: 3500, u: 10000, i: 5000, o: 15000 },
-    dang: { y: 7500, u: 10000, i: 12000, o: 18000 },
+    khang: { y: 3500, u: 10000, i: 5000, o: 17000 },
+    dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
     loi: { y: 6000, u: 12000, i: 5000, o: 18000 },
     tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
     thoai: { y: 6000, u: 7000, i: 11000, o: 25000 },
-    quang: { y: 8000, u: 14000, i: 25000, o: 35000 }
+    quang: { y: 8000, u: 14000, i: 25000, o: 30000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -385,10 +385,10 @@ function useU() {
         let isPunchSuccess = false;
         bots.forEach(b => {
             let dx = b.x - player.x, dy = b.y - player.y, d = Math.sqrt(dx * dx + dy * dy);
-            if (d < 4) {
-                b.x += (dx / d) * 3;
-                b.y += (dy / d) * 3;
-                b.delayUntil = now + 2500;
+            if (d < 5) {
+                b.x += (dx / d) * 4;
+                b.y += (dy / d) * 4;
+                b.delayUntil = now + 2000;
                 isPunchSuccess = true;
             }
         });
@@ -618,6 +618,7 @@ function useO() {
     } else if (selectedChar === 'khang') {
         player.isUlt = true;
         player.ultEnd = now + 6000;
+        iCD = now;
         player.khangTraps = 5;
         document.getElementById('trap-counter').classList.remove('hidden');
         document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: 5`;
@@ -1033,6 +1034,12 @@ function update() {
                 }
             }
         }
+        for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+                spawnShockwave(player.x, player.y, i % 2 ? '#c1c1c1' : '#a6a6a6');
+                if (i < 6) shakeAmount = Math.max(shakeAmount, 15);
+            }, i * 50);
+        }
         shakeAmount = 250;
         playSound('assets/landing.mp3', 0.85);
         if (checkCollision(player.x, player.y)) {
@@ -1073,11 +1080,15 @@ function update() {
             startTime = now;
             player.x = 1.5;
             player.y = 1.5;
-            // reduce player CDs by 1.25
-            yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * 0.25);
-            uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * 0.25);
-            iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * 0.25);
-            oCD = Math.max(now, oCD - COOLDOWNS[selectedChar].o * 0.25);
+            // reduce player CDs
+            yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * 0.2);
+            uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * 0.2);
+            iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * 0.2);
+            oCD = Math.max(now, oCD - COOLDOWNS[selectedChar].o * 0.2);
+            if (selectedChar === 'khang' && player.isUlt) {
+                iCD = now;
+                player.khangTraps = 5;
+            }
             playSound('assets/newlevel.mp3');
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
