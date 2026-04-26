@@ -1,5 +1,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;700&display=swap');
 
+/* Time Stop */
+
+.time-stop * {
+  animation-play-state: paused !important;
+  filter: sepia(1) blur(1px);
+}
+
+.time-stop::before {
+  content: '';
+  position: fixed;
+  top: 50%; left: 50%;
+  width: 0; height: 0;
+  background: radial-gradient(circle, transparent, rgba(255,220,0,0.4));
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: shockwave 0.6s ease-out forwards;
+  z-index: 9999;
+}
+
+@keyframes shockwave {
+  to { width: 600px; height: 600px; opacity: 0; }
+}   
+
 /* Wobble Thingy */
 
 .wobble {

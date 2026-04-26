@@ -3,7 +3,8 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 2)";
+const version = "1.2 (preview, build 3)";
+const debugmode = true;
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
@@ -19,6 +20,7 @@ let player = {
     isParrySuccess: false,
     isSuperSlow: false, superSlowEnd: 0,
     isSlow: false, slowEnd: 0,
+    isFast: false, fastEnd: 0,
     isTanGod: false, tanGodEnd: 0,
     isTanSharingan: false, tanSharinganEnd: 0,
     isTanUlt: false, tanUltEnd: 0,
@@ -47,9 +49,9 @@ var filterStrength = 20;
 var frameTime = 0, lastLoop = new Date, thisLoop;
 
 const COOLDOWNS = {
-    khang: { y: 3500, u: 10000, i: 5000, o: 17000 },
+    khang: { y: 3500, u: 12000, i: 5000, o: 20000 },
     dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
-    loi: { y: 6000, u: 12000, i: 5000, o: 18000 },
+    loi: { y: 6000, u: 12000, i: 6000, o: 18000 },
     tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
     thoai: { y: 6000, u: 7000, i: 11000, o: 25000 },
     quang: { y: 10000, u: 14000, i: 25000, o: 25000 }
@@ -221,7 +223,7 @@ function checkCollision(x, y, ignoreWalls = false) {
 function resolveWallStick() {
     if (checkCollision(player.x, player.y)) {
         const dirs = [[0.1, 0], [-0.1, 0], [0, 0.1], [0, -0.1]];
-        for (let dist = 0.1; dist < 1.7; dist += 0.1) {
+        for (let dist = 0.1; dist < 1.8; dist += 0.1) {
             for (let [dx, dy] of dirs) {
                 if (!checkCollision(player.x + dx * dist, player.y + dy * dist)) {
                     player.x += dx * dist;
@@ -381,6 +383,13 @@ function useU() {
         freezeEnd = now + 4000;
         spawnShockwave(player.x, player.y, 'rgba(255,255,255,0.5)');
         playSound('assets/timestop.mp3', 1.0);
+        document.body.classList.add('time-stop');
+        // play the time-stop effect in reverse
+        setTimeout(() => {
+            document.body.classList.remove('time-stop');
+            spawnShockwave(player.x, player.y, 'rgba(255,255,255,0.5)');
+        }, 4000);
+
     } else if (selectedChar === 'dang') {
         let isPunchSuccess = false;
         bots.forEach(b => {
@@ -831,15 +840,17 @@ function update() {
     // PLAYER MOVE
     let baseSpd = isHard ? 0.135 : 0.065 + ((isHard ? 0.0675 : 0.0125) * currentLevel);
     let mult = 1;
-    if (player.isDelayed) mult = 0;
-    else if (player.isParrying) mult = 0.015;
-    else if (player.isParrySuccess) {
-        mult = 1.3;
+    if (player.isParrySuccess) {
+        player.isFast = true;
+        player.fastEnd = now + 2000;
         player.isParrySuccess = false;
         iCD = Math.max(iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
     }
+    if (player.isDelayed) mult = 0;
+    else if (player.isParrying) mult = 0.015;
     else {
-        if (player.isCoffee) mult *= 1.5;
+        if (player.isFast) mult *= 1.15;
+        if (player.isCoffee) mult *= 1.25;
         if (player.isMedalSpeed) mult *= 2.0;
         if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.6);
         if (player.isSuperSlow && now < player.superSlowEnd) mult *= 0.25;
@@ -1044,7 +1055,7 @@ function update() {
         playSound('assets/landing.mp3', 0.85);
         if (checkCollision(player.x, player.y)) {
             let dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
-            for (let dist = 0.1; dist < 4; dist += 0.1) {
+            for (let dist = 0.1; dist < 8; dist += 0.1) {
                 for (let [dx, dy] of dirs) {
                     if (!checkCollision(player.x + dx * dist, player.y + dy * dist)) {
                         player.x += dx * dist;
@@ -1054,6 +1065,8 @@ function update() {
                 }
             }
         }
+        if (Math.floor(player.x) > COLS - 2) player.x = COLS - 2;
+        if (Math.floor(player.y) > ROWS - 2) player.y = ROWS - 2;
     }
 
     // QUANG GRAVITY VISUAL: pull bots toward player while gravity active
@@ -1104,12 +1117,14 @@ function update() {
     trails = trails.filter(t => t.life > 0);
     traps = traps.filter(t => now < t.life);
     if (shakeAmount > 0) shakeAmount *= 0.92;
-
     if (now > freezeEnd) freezeEnd = 0;
     if (now > player.parryEnd) {
         if (player.isParrying && !player.isParrySuccess) playSound('assets/missing.mp3', 0.8)
         player.isParrying = false;
     }
+    if (now > player.fastEnd) player.isFast = false;
+    if (now > player.slowEnd) player.isSlow = false;
+    if (now > player.superSlowEnd) player.isSuperSlow = false;
     if (now > player.ghostEnd) player.isGhost = false;
     if (now > player.coffeeEnd) player.isCoffee = false;
     if (now > player.shieldEnd) player.isShield = false;
@@ -1148,9 +1163,15 @@ function update() {
     draw(isCommonRage & isRageable);
     requestAnimationFrame(update);
 
-    var thisFrameTime = (thisLoop=new Date) - lastLoop;
+    var thisFrameTime = (thisLoop = new Date) - lastLoop;
     frameTime += (thisFrameTime - frameTime) / filterStrength;
     lastLoop = thisLoop;
+    if (debugmode) {
+        const debug = document.getElementById('debug');
+        debug.classList.remove('hidden');
+        debug.innerText = 'X: ' + player.x.toFixed(3) + '; Y: ' + player.y.toFixed(3)
+                        + '\nSpeed: ' + (pSpd);
+    }
 }
 
 /**
@@ -1445,6 +1466,7 @@ function resetGameState() {
         isParrySuccess: false,
         isSuperSlow: false, superSlowEnd: 0,
         isSlow: false, slowEnd: 0,
+        isFast: false, fastEnd: 0,
         isTanGod: false, tanGodEnd: 0,
         isTanSharingan: false, tanSharinganEnd: 0,
         isTanUlt: false, tanUltEnd: 0,
