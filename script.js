@@ -79,6 +79,9 @@ function shiftTimers(delta) {
     player.ghostEnd += delta;
     player.coffeeEnd += delta;
     player.medalSpeedEnd += delta;
+    player.fastEnd += delta;
+    player.slowEnd += delta;
+    player.superSlowEnd += delta;
     player.delayEnd += delta;
     player.parryEnd += delta;
     player.invincibleEnd += delta;
@@ -627,11 +630,11 @@ function useO() {
     } else if (selectedChar === 'khang') {
         player.isUlt = true;
         player.ultEnd = now + 6000;
+        playSound('assets/lets-go.mp3', 1);
         iCD = now;
         player.khangTraps = 5;
         document.getElementById('trap-counter').classList.remove('hidden');
         document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: 5`;
-        playSound('assets/lets-go', 0.8);
         for (let i = 0; i < 8; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, 'rgba(255,255,255,0.8)');
@@ -925,7 +928,7 @@ function update() {
             let target = (decoys.length > 0) ? decoys[0] : player;
             if (now > b.nextPathUpdate || b.currentPath.length === 0) {
                 b.currentPath = getPath(b.x, b.y, target.x, target.y);
-                b.nextPathUpdate = now + (isCommonRage ? 150 : 350);
+                b.nextPathUpdate = now + (isCommonRage ? 175 : 250);
             }
             if (b.currentPath && b.currentPath.length > 1) {
                 let next = b.currentPath[1];
@@ -1080,8 +1083,6 @@ function update() {
     // LEVELING
     if (maze[Math.floor(player.y)][Math.floor(player.x)] === 'K' && !player.isQuangJumping) {
         if (currentLevel < 5) {
-            player.isSpeedBoost = true;
-            player.speedBoostEnd = 3000;
             currentLevel++;
             generateMaze();
             bots = [];
@@ -1101,6 +1102,7 @@ function update() {
             if (selectedChar === 'khang' && player.isUlt) {
                 iCD = now;
                 player.khangTraps = 5;
+                document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: 5`;
             }
             playSound('assets/newlevel.mp3');
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
@@ -1130,7 +1132,6 @@ function update() {
     if (now > player.shieldEnd) player.isShield = false;
     if (now > player.invincibleEnd) player.isInvincible = false;
     if (now > player.medalSpeedEnd) player.isMedalSpeed = false;
-    if (now > player.speedBoostEnd) player.isSpeedBoost = false;
     if (now > player.ultEnd) {
         if (player.isUlt && selectedChar === 'khang') 
             document.getElementById('trap-counter').classList.add('hidden');
@@ -1462,7 +1463,6 @@ function resetGameState() {
         isDelayed: false, delayEnd: 0,
         isParrying: false, parryEnd: 0,
         isInvincible: false, invincibleEnd: 0,
-        isSpeedBoost: true, speedBoostEnd: 3000,
         isParrySuccess: false,
         isSuperSlow: false, superSlowEnd: 0,
         isSlow: false, slowEnd: 0,
@@ -1537,7 +1537,7 @@ window.selectChar = (c) => {
             if (id === c) {
                 display.classList.remove('hidden');
                 display.classList.add('block');
-                display.style.animation = 'fadeIn 0.3s ease-out, wobble 0.6s';
+                display.style.animation = 'fadeIn 0.3s ease-out, wobble 1s';
             } else {
                 display.classList.add('hidden');
                 display.classList.remove('block');

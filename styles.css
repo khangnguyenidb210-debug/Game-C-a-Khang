@@ -26,7 +26,7 @@
 /* Wobble Thingy */
 
 .wobble {
-  animation: wobble 1s ease-in-out infinite;
+  animation: wobble 2s ease-in-out infinite;
 }
 
 @keyframes wobble {
@@ -36,6 +36,20 @@
   45% { transform: translateX(-15%) rotate(-6deg); }
   60% { transform: translateX(10%) rotate(4deg); }
   75% { transform: translateX(-5%) rotate(-2deg); }
+  100% { transform: translateX(0%) rotate(0deg); }
+}
+
+@keyframes wobble-but-more {
+  0% { transform: translateX(0%) rotate(0deg); }
+  10% { transform: translateX(-25%) rotate(-10deg); }
+  20% { transform: translateX(20%) rotate(6deg); }
+  30% { transform: translateX(-15%) rotate(-6deg); }
+  40% { transform: translateX(25%) rotate(10deg); }
+  50% { transform: translateX(-15%) rotate(-6deg); }
+  60% { transform: translateX(10%) rotate(4deg); }
+  70% { transform: translateX(-15%) rotate(-6deg); }
+  80% { transform: translateX(10%) rotate(4deg); }
+  90% { transform: translateX(-5%) rotate(-2deg); }
   100% { transform: translateX(0%) rotate(0deg); }
 }
 
