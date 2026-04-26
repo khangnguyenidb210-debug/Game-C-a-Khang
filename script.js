@@ -917,10 +917,13 @@ function update() {
         };
         traps.forEach((t, idx) => {
             if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
-                b.delayUntil = now + (isHard ? 2500 : 3500);
+                b.delayUntil = now + (isHard ? 2000 : 3000);
                 spawnShockwave(t.x, t.y, '#fff');
                 playSound('assets/ahhhhhhhhhh.mp3', 0.25);
                 traps.splice(idx, 1);
+                b.superEnraged = true;
+                b.superRageStart = now + (isHard ? 2000 : 3000);
+                b.superRageEnd = now + (isHard ? 2000 : 3000) + 5000;
             }
         });
 
