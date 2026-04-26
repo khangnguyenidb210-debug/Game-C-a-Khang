@@ -75,12 +75,6 @@
                     </div>
                 </div>
                 <div class="relative group">
-                    <button onclick="selectChar('tan')" class="char-tab w-10 h-10 rounded-full bg-orange-500 text-black font-bold text-sm border-2 border-slate-700 hover:scale-110 transition-all">T</button>
-                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-20 p-2 bg-slate-900 border border-orange-500 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                        <p class="text-xs text-orange-400 font-bold mb-1">Tân Ốm</p>
-                    </div>
-                </div>
-                <div class="relative group">
                     <button onclick="selectChar('thoai')" class="char-tab w-10 h-10 rounded-full bg-violet-400 text-black font-bold text-sm border-2 border-slate-700 hover:scale-110 transition-all">📱</button>
                     <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-24 p-2 bg-slate-900 border border-violet-400 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                         <p class="text-xs text-violet-300 font-bold mb-1">Điện Thoại</p>
@@ -90,6 +84,12 @@
                     <button onclick="selectChar('quang')" class="char-tab w-10 h-10 rounded-full bg-amber-600 text-black font-bold text-sm border-2 border-slate-700 hover:scale-110 transition-all">Q</button>
                     <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-24 p-2 bg-slate-900 border border-amber-600 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                         <p class="text-xs text-amber-500 font-bold mb-1">Quang 180</p>
+                    </div>
+                </div>
+                <div class="relative group">
+                    <button onclick="selectChar('tan')" class="char-tab w-10 h-10 rounded-full bg-orange-500 text-black font-bold text-sm border-2 border-slate-700 hover:scale-110 transition-all">T</button>
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-20 p-2 bg-slate-900 border border-orange-500 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                        <p class="text-xs text-orange-400 font-bold mb-1">Tân Ốm</p>
                     </div>
                 </div>
                 <div class="relative group">
@@ -159,24 +159,6 @@
                     </div>
                 </div>
             </div>
-            <!-- Tan -->
-            <div id="char-display-tan" class="char-display hidden">
-                <div class="p-6 rounded-2xl border-2 border-orange-500 bg-orange-500/10">
-                    <div class="flex items-center gap-4 mb-4">
-                        <div class="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center text-5xl font-black shadow-[0_0_30px_rgba(249,115,22,0.5)] text-black">T</div>
-                        <div class="text-left">
-                            <h2 class="text-2xl font-bold uppercase text-orange-400">Tân Ốm</h2>
-                            <p class="text-sm text-slate-400">Nhân vật cao thủ</p>
-                        </div>
-                    </div>
-                    <div class="text-left">
-                        <p class="skill-text"><b class="text-white">[Y] God Mode:</b> 2x tốc độ & bất tử 5s.</p>
-                        <p class="skill-text"><b class="text-white">[U] Sharingan:</b> Màn đỏ, đóng băng bot 5s.</p>
-                        <p class="skill-text"><b class="text-white">[I] Delete:</b> Xóa sổ tất cả thực thể.</p>
-                        <p class="skill-text"><b class="text-yellow-500">[O] Hunter Time:</b> Tiêu diệt bot & +0.25x tốc độ (2.5x MAX).</p>
-                    </div>
-                </div>
-            </div>
             <!-- Thoai -->
             <div id="char-display-thoai" class="char-display hidden">
                 <div class="p-6 rounded-2xl border-2 border-violet-400 bg-violet-500/10">
@@ -210,6 +192,24 @@
                         <p class="skill-text"><b class="text-white">[U] Hấp Dẫn:</b> Tạo ra "lực hấp dẫn" riêng và hấp thụ bot.</p>
                         <p class="skill-text"><b class="text-white">[I] Ợ Hơi:</b> Đẩy lùi mọi bot xung quanh và làm chậm.</p>
                         <p class="skill-text"><b class="text-yellow-500">[O] Nhảy:</b> Nhảy khỏi map và phá hủy mọi thứ khi tiếp đất.</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Tân Ốm -->
+            <div id="char-display-tan" class="char-display hidden">
+                <div class="p-6 rounded-2xl border-2 border-orange-500 bg-orange-500/10">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center text-5xl font-black shadow-[0_0_30px_rgba(249,115,22,0.5)] text-black">T</div>
+                        <div class="text-left">
+                            <h2 class="text-2xl font-bold uppercase text-orange-400">Tân Ốm</h2>
+                            <p class="text-sm text-slate-400">Nhân vật cao thủ</p>
+                        </div>
+                    </div>
+                    <div class="text-left">
+                        <p class="skill-text"><b class="text-white">[Y] God Mode:</b> 2x tốc độ & bất tử 5s.</p>
+                        <p class="skill-text"><b class="text-white">[U] Sharingan:</b> Màn đỏ, đóng băng bot 5s.</p>
+                        <p class="skill-text"><b class="text-white">[I] Delete:</b> Xóa sổ tất cả thực thể.</p>
+                        <p class="skill-text"><b class="text-yellow-500">[O] Hunter Time:</b> Tiêu diệt bot & +0.25x tốc độ (2.5x MAX).</p>
                     </div>
                 </div>
             </div>

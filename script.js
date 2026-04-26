@@ -21,9 +21,10 @@ let player = {
     isSuperSlow: false, superSlowEnd: 0,
     isSlow: false, slowEnd: 0,
     isFast: false, fastEnd: 0,
+    // Tan skills
     isTanGod: false, tanGodEnd: 0,
     isTanSharingan: false, tanSharinganEnd: 0,
-    isTanUlt: false, tanUltEnd: 0,
+    isTanHunter: false, tanHunterEnd: 0,
     countKills: 0,
     // Thoai skills
     isThoaiSlow: false, thoaisuperSlowEnd: 0,       // [Y] bots slowed
@@ -94,7 +95,7 @@ function shiftTimers(delta) {
     player.superSlowEnd += delta;
     player.tanGodEnd += delta;
     player.tanSharinganEnd += delta;
-    player.tanUltEnd += delta;
+    player.tanHunterEnd += delta;
     player.thoaisuperSlowEnd += delta;
     player.thoaiBoostedEnd += delta;
     player.thoaiHunterEnd += delta;
@@ -780,8 +781,8 @@ function useO() {
         playSound('assets/stagger.mp3', 1);
     } else if (selectedChar === 'tan') {
         // HUNTER ULT: become hunter — touching bots destroys them, +0.25x speed per kill, lasts 30s
-        player.isTanUlt = true;
-        player.tanUltEnd = now + 30000;
+        player.isTanHunter = true;
+        player.tanHunterEnd = now + 30000;
         player.tanUltKills = 0;
         player.isInvincible = true;
         player.invincibleEnd = now + 30000;
@@ -920,7 +921,7 @@ function update() {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#ef4444';
             statusEl.innerText = "👁 SHARINGAN! (BOT BỊ ĐÓNG BĂNG)";
-        } else if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) {
+        } else if (selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#f97316';
             statusEl.innerText = `🔥 HUNTER MODE! KILLS: ${player.countKills}`;
@@ -1002,7 +1003,7 @@ function update() {
         if (player.isSuperSlow && now < player.superSlowEnd) mult *= 0.25;
         if (player.isSlow && now < player.slowEnd) mult *= 0.525;
         if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) mult *= 2.0;
-        if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd)
+        if (selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd)
             mult *= (1.0 + player.tanUltKills * 0.25);
         if (selectedChar === 'thoai' && player.isThoaiBoosted && now < player.thoaiBoostedEnd) mult *= 2.0;
         if (selectedChar === 'thoai' && player.isThoaiPenalty && now < player.thoaiPenaltyEnd) mult *= 0.5;
@@ -1023,7 +1024,7 @@ function update() {
     if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) {
         spawnTrail(player.x, player.y, 'rgba(250,204,21,0.7)');
     }
-    if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) {
+    if (selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd) {
         spawnTrail(player.x, player.y, 'rgba(239,68,68,0.8)');
     }
     if (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd) {
@@ -1146,7 +1147,7 @@ function update() {
         }
         // collision with player
         if (Math.sqrt((player.x - b.x) ** 2 + (player.y - b.y) ** 2) < 0.5) {
-            if ((selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) ||
+            if ((selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd) ||
                 (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd)) {
                 spawnShockwave(b.x, b.y, '#facc15');
                 spawnShockwave(b.x, b.y, '#ef4444');
@@ -1378,7 +1379,7 @@ function update() {
     if (now > player.roadEnd) showRoad = false;
     if (now > player.tanGodEnd) player.isTanGod = false;
     if (now > player.tanSharinganEnd) player.isTanSharingan = false;
-    if (now > player.tanUltEnd) player.isTanUlt = false;
+    if (now > player.tanHunterEnd) player.isTanHunter = false;
     if (now > player.thoaisuperSlowEnd) player.isThoaiSlow = false;
     if (now > player.thoaiBoostedEnd) player.isThoaiBoosted = false;
     if (now > player.thoaiHunterEnd) { player.isThoaiHunter = false; player.isInvincible = false; }
@@ -1603,7 +1604,7 @@ function draw(inRage) {
     if (player.isParrying) pCol = '#7ec8d5';
     if (player.isGhost && selectedChar === 'dang') pCol = 'rgba(6, 182, 212, 0.5)';
     if (selectedChar === 'tan' && player.isTanGod && Date.now() < player.tanGodEnd) pCol = '#facc15';
-    if (selectedChar === 'tan' && player.isTanUlt && Date.now() < player.tanUltEnd) pCol = '#ef4444';
+    if (selectedChar === 'tan' && player.isTanHunter && Date.now() < player.tanHunterEnd) pCol = '#ef4444';
     if (selectedChar === 'thoai' && player.isThoaiHunter && Date.now() < player.thoaiHunterEnd) pCol = '#facc15';
     if (selectedChar === 'thoai' && player.isThoaiBoosted && Date.now() < player.thoaiBoostedEnd) pCol = '#22c55e';
     if (selectedChar === 'thoai' && player.isThoaiPenalty && Date.now() < player.thoaiPenaltyEnd) pCol = '#475569';
@@ -1757,7 +1758,7 @@ function resetGameState() {
         isFast: false, fastEnd: 0,
         isTanGod: false, tanGodEnd: 0,
         isTanSharingan: false, tanSharinganEnd: 0,
-        isTanUlt: false, tanUltEnd: 0,
+        isTanHunter: false, tanHunterEnd: 0,
         countKills: 0,
         isThoaiSlow: false, thoaisuperSlowEnd: 0,
         isThoaiBoosted: false, thoaiBoostedEnd: 0,
