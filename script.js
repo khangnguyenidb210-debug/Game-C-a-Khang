@@ -10,7 +10,7 @@ let maze = [];
 
 let player = {
     x: 1.5, y: 1.5,
-    isCoffee: false, isGhost: false, isShield: false, isUlt: false,
+    isMoving: false, isCoffee: false, isGhost: false, isShield: false, isUlt: false,
     ultEnd: 0, roadEnd: 0, shieldEnd: 0, ghostEnd: 0, coffeeEnd: 0,
     khangDashCount: 0, khangTraps: 5,
     isMedalSpeed: false, medalSpeedEnd: 0,
@@ -33,13 +33,18 @@ let player = {
     // Quang skills
     isQuangJumping: false, quangJumpEnd: 0, // [O] earthquake jump
     isQuangGravity: false, quangGravityEnd: 0,   // [U] gravity field
-    isQuangBotSlowed: false, quangBotsuperSlowEnd: 0  // [I/O] bot slow after explosion
+    // Trung Béo skills
+    isTrungWindGod: false, trungWindGodEnd: 0,   // [Y] 2.5x speed + ghost 5s
+    isTrungTired: false, trungTiredEnd: 0,         // [Y] after wind god: 0.5x speed 2s
+    isTrungHasagi: false, trungHasagiEnd: 0,       // [U] shockwave push everyone through maze
+    isTrungDashing: false, trungDashEnd: 0,        // [I] atomic slice dash
+    isTrungRasengan: false, trungRasenganEnd: 0,   // [O] wind ball follows player
+    trungRasenganX: 0, trungRasenganY: 0
 };
 
 let bots = [], particles = [], decoys = [], trails = [], shockwaves = [], traps = [], blackholes = [];
-let gameActive = false, gamePaused = false, pauseStart = 0, startTime = 0, selectedChar = 'khang', gameMode = 'normal', currentLevel = 1;
-let selectedBot = 'quyen';
-let popupEnd = 0;
+let gameActive = false, gamePaused = false, pauseStart = 0, startTime = 0, currentLevel = 1;
+let selectedBot = 'quyen', selectedChar = 'khang', gameMode = 'normal';
 let yCD = 0, uCD = 0, iCD = 0, oCD = 0, freezeEnd = 0, lastBotSpawnTime = 0;
 let shakeAmount = 0, showRoad = false;
 let alarmSoundPlaying = false;
@@ -54,7 +59,8 @@ const COOLDOWNS = {
     loi: { y: 6000, u: 12000, i: 6000, o: 18000 },
     tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
     thoai: { y: 6000, u: 7000, i: 11000, o: 25000 },
-    quang: { y: 12000, u: 15000, i: 18000, o: 25000 }
+    quang: { y: 14000, u: 14000, i: 12000, o: 28000 },
+    trung: { y: 15000, u: 14000, i: 8000, o: 18000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -93,7 +99,13 @@ function shiftTimers(delta) {
     player.thoaiBoostedEnd += delta;
     player.thoaiHunterEnd += delta;
     player.thoaiPenaltyEnd += delta;
+    player.trungWindGodEnd += delta;
+    player.trungTiredEnd += delta;
+    player.trungHasagiEnd += delta;
+    player.trungDashEnd += delta;
+    player.trungRasenganEnd += delta;
     traps.forEach(t => t.life += delta);
+    blackholes.forEach(b => b.lifeEnd += delta);
     decoys.forEach(d => d.lifeEnd += delta);
     bots.forEach(b => {
         b.nextPathUpdate += delta;
@@ -285,7 +297,7 @@ function getPath(sx, sy, tx, ty) {
  */
 function useY() {
     const now = Date.now();
-    if (now < yCD || player.isDelayed) return;
+    if (now < yCD || player.isDelayed || player.isTrungTired) return;
     if (selectedChar === 'khang') {
         const isUlt = player.isUlt;
         let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
@@ -375,12 +387,32 @@ function useY() {
             b.quangEarthquakeSlowUntil = now + 5000;
         });
         yCD = now + COOLDOWNS.quang.y * (selectedBot === 'anh' ? 1.5 : 1);
+    } else if (selectedChar === 'trung') {
+        // CON CỦA THẦN GIÓ: 2x speed + ghost through bots 5s, then tired 0.5x for 2s
+        player.isTrungWindGod = true;
+        player.trungWindGodEnd = now + 5000;
+        player.isGhost = true;
+        player.ghostEnd = now + 5000;
+        shakeAmount = 25;
+        for (let i = 0; i < 12; i++) {
+            setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#38bdf8' : '#e0f2fe'), i * 80);
+        }
+        playSound('assets/the-child-of-the-wind-god.mp3', 0.45);
+        setTimeout(() => {
+            player.isTrungWindGod = false;
+            player.isGhost = false;
+            player.isTrungTired = true;
+            player.trungTiredEnd = now + 7000; // 5s wind + 2s tired
+            spawnShockwave(player.x, player.y, '#94a3b8');
+            playSfx(200, 'sine', 0.3, 0.2, 100);
+        }, 5000);
+        yCD = now + COOLDOWNS.trung.y * (selectedBot === 'anh' ? 1.5 : 1);
     }
 }
 
 function useU() {
     const now = Date.now();
-    if (now < uCD || player.isDelayed) return;
+    if (now < uCD || player.isDelayed || player.isTrungTired) return;
     shakeAmount = 10;
     if (selectedChar === 'khang') {
         freezeEnd = now + 4000;
@@ -510,13 +542,46 @@ function useU() {
             }, i * 200);
         }
         playSfx(80, 'sine', 0.5, 0.35, 40);
+    } else if (selectedChar === 'trung') {
+        // HASAGI: wild shockwave push everyone through the maze
+        shakeAmount = 35;
+        playSound('assets/hasagi.mp3', 0.7);
+        for (let i = 0; i < 15; i++) {
+            setTimeout(() => {
+                spawnShockwave(player.x, player.y, i % 2 ? '#60a5fa' : '#bfdbfe');
+                shakeAmount = Math.max(shakeAmount, 20);
+            }, i * 60);
+        }
+        // Push ALL bots away from player ignoring walls
+        bots.forEach(b => {
+            const dx = b.x - player.x, dy = b.y - player.y;
+            const d = Math.sqrt(dx * dx + dy * dy) || 1;
+            const pushDist = 8;
+            b.x = Math.max(1, Math.min(COLS - 2, b.x + (dx / d) * pushDist));
+            b.y = Math.max(1, Math.min(ROWS - 2, b.y + (dy / d) * pushDist));
+            b.delayUntil = now + 2000;
+        });
+        // Resolve bots that landed in walls
+        bots.forEach(b => {
+            if (checkCollision(b.x, b.y)) {
+                const dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
+                for (let dist = 0.1; dist < 5; dist += 0.1) {
+                    for (let [ddx, ddy] of dirs) {
+                        if (!checkCollision(b.x + ddx * dist, b.y + ddy * dist)) {
+                            b.x += ddx * dist; b.y += ddy * dist; break;
+                        }
+                    }
+                    if (!checkCollision(b.x, b.y)) break;
+                }
+            }
+        });
     }
     uCD = now + COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1);
 }
 
 function useI() {
     const now = Date.now();
-    if (now < iCD || player.isDelayed) return;
+    if (now < iCD || player.isDelayed || player.isTrungTired) return;
     if (selectedChar === 'khang' && player.isUlt) {
         if (player.khangTraps > 0) {
             traps.push({ 
@@ -595,26 +660,73 @@ function useI() {
         }, 600);
         playSound('assets/motcaichettruyenthong.mp3', 0.67);
     } else if (selectedChar === 'quang') {
-        blackholes.push({
-            x: player.x,
-            y: player.y,
-            lifeEnd: now + 3000,
-            radius: 0,
-            isMega: true,
-            exploded: false
-        });
-        shakeAmount = 45;
-        for (let i = 0; i < 18; i++) {
-            setTimeout(() => spawnShockwave(player.x, player.y, i % 3 === 0 ? '#000' : (i % 3 === 1 ? '#4c1d95' : '#7c3aed')), i * 60);
+        playSound('assets/burps.mp3', 0.7);
+        for (let i = 0; i < 10; i++) {
+            setTimeout(() => {
+                spawnShockwave(player.x, player.y, i % 2 ? '#33d87d' : '#20e820');
+                shakeAmount = 50;
+            }, i * 60);
         }
-        playSound('assets/black-hole.mp3', 1.0);
+        bots.forEach(b => {
+            const dx = b.x - player.x, dy = b.y - player.y;
+            const d = Math.sqrt(dx * dx + dy * dy) || 1;
+            const pushDist = 5;
+            b.x = Math.max(1, Math.min(COLS - 2, b.x + (dx / d) * pushDist));
+            b.y = Math.max(1, Math.min(ROWS - 2, b.y + (dy / d) * pushDist));
+            b.slowEnd = now + 2500;
+        });
+        bots.forEach(b => {
+            if (checkCollision(b.x, b.y)) {
+                const dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
+                for (let dist = 0.1; dist < 5; dist += 0.1) {
+                    for (let [ddx, ddy] of dirs) {
+                        if (!checkCollision(b.x + ddx * dist, b.y + ddy * dist)) {
+                            b.x += ddx * dist; b.y += ddy * dist; 
+                            break;
+                        }
+                    }
+                    if (!checkCollision(b.x, b.y)) break;
+                }
+            }
+        });
+    } else if (selectedChar === 'trung') {
+        // ATOMIC SLICE: dash like Khang Y, kill all bots surfed past (split effect)
+        let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
+        if (!dx && !dy) dy = -1;
+        playSound('assets/katana-schwing.mp3', 0.45);
+        const dashPositions = [];
+        for (let i = 0; i < 16; i++) {
+            let nx = player.x + dx * 0.4, ny = player.y + dy * 0.4;
+            if (!checkCollision(nx, ny)) {
+                spawnTrail(player.x, player.y, 'rgba(186,230,253,0.7)');
+                player.x = nx; player.y = ny;
+                dashPositions.push({ x: player.x, y: player.y });
+            } else break;
+        }
+        shakeAmount = 15;
+        // Kill bots along the dash path
+        bots.forEach(b => {
+            const wasHit = dashPositions.some(p => Math.sqrt((b.x - p.x) ** 2 + (b.y - p.y) ** 2) < 0.7);
+            if (wasHit) {
+                // Spawn split effect (two shockwaves flying apart)
+                for (let s = 0; s < 5; s++) {
+                    setTimeout(() => {
+                        spawnShockwave(b.x + s * dx * 0.3, b.y + s * dy * 0.3, '#bfdbfe');
+                        spawnShockwave(b.x - s * dx * 0.3, b.y - s * dy * 0.3, '#7dd3fc');
+                    }, s * 40);
+                }
+                playSound('assets/kill.mp3', 0.8);
+                b.isDead = true;
+            }
+        });
+        bots = bots.filter(b => !b.isDead);
     }
     iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1);
 }
 
 function useO() {
     const now = Date.now();
-    if (now < oCD || player.isDelayed) return;
+    if (now < oCD || player.isDelayed || player.isTrungTired) return;
     shakeAmount = 40;
     if (selectedChar === 'dang') {
         player.isUlt = true;
@@ -682,11 +794,12 @@ function useO() {
             x: player.x,
             y: player.y,
             lifeEnd: now + 5000,
-            radius: 0
+            radius: 0,
+            exploded: false
         });
         shakeAmount = 40;
-        for (let i = 0; i < 12; i++) {
-            setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#000' : '#7c3aed'), i * 60);
+        for (let i = 0; i < 18; i++) {
+            setTimeout(() => spawnShockwave(player.x, player.y, i % 3 === 0 ? '#000' : (i % 3 === 1 ? '#4c1d95' : '#7c3aed')), i * 60);
         }
         playSound('assets/black-hole.mp3', 0.67);
     } else if (selectedChar === 'quang') {
@@ -694,12 +807,24 @@ function useO() {
         player.isQuangJumping = true;
         player.quangJumpEnd = now + 1000;
         player.isInvincible = true;
-        player.invincibleEnd = now + 1000;
+        player.invincibleEnd = now + 1150;
         playSound('assets/wee.mp3', 0.4);
         setTimeout(() => {
             player.isSlow = true;
             player.slowEnd = now + 700;
         }, 150);
+    } else if (selectedChar === 'trung') {
+        // RASENGAN: spawn wind ball that follows player for 5s
+        // if a bot touches it: that bot 0.25x for 30s, all others pushed + 0.5x for 3s
+        player.isTrungRasengan = true;
+        player.trungRasenganEnd = now + 5000;
+        player.trungRasenganX = player.x;
+        player.trungRasenganY = player.y;
+        shakeAmount = 20;
+        playSound('assets/rasengan-sound-effect.mp3', 0.67);
+        for (let i = 0; i < 10; i++) {
+            setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#38bdf8' : '#7dd3fc'), i * 80);
+        }
     }
     oCD = now + COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1);
 }
@@ -814,11 +939,23 @@ function update() {
         } else if (selectedChar === 'quang' && player.isQuangGravity && now < player.quangGravityEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#c084fc';
-            statusEl.innerText = `🌀 TRỌNG LỰC! (BOT ĐÓNG BĂNG)`;
+            statusEl.innerText = `🌀 LỰC HẤP DẪN (BẠN ĐANG THU HÚT BOT)`;
         } else if (selectedChar === 'quang' && player.isSuperSlow && now < player.superSlowEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#c084fc';
             statusEl.innerText = '🐌 TRỌNG LỰC PHẢN (0.25X TỐC ĐỘ)';
+        } else if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) {
+            statusEl.classList.remove('opacity-0');
+            statusEl.style.color = '#38bdf8';
+            statusEl.innerText = '🌬️ CON CỦA THẦN GIÓ! (2X TỐC ĐỘ + XUYÊN BOT)';
+        } else if (selectedChar === 'trung' && player.isTrungTired && now < player.trungTiredEnd) {
+            statusEl.classList.remove('opacity-0');
+            statusEl.style.color = '#94a3b8';
+            statusEl.innerText = '😮‍💨 MỆT RỒI... (0.5X TỐC ĐỘ)';
+        } else if (selectedChar === 'trung' && player.isTrungRasengan && now < player.trungRasenganEnd) {
+            statusEl.classList.remove('opacity-0');
+            statusEl.style.color = '#7dd3fc';
+            statusEl.innerText = '🌀 RASENGAN! (DẪN CẦU GIÓ TẤN CÔNG BOT)';
         } else {
             statusEl.style.color = '';
             statusEl.classList.add('opacity-0');
@@ -843,9 +980,10 @@ function update() {
     // PLAYER MOVE
     let baseSpd = isHard ? 0.12 : 0.06 + ((isHard ? 0.05 : 0.015) * currentLevel);
     let mult = 1;
+    player.isMoving = false;
     if (player.isParrySuccess) {
         player.isFast = true;
-        player.fastEnd = now + 2000;
+        player.fastEnd = now + 1500;
         player.isParrySuccess = false;
         iCD = Math.max(iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
     }
@@ -863,13 +1001,15 @@ function update() {
             mult *= (1.0 + player.tanUltKills * 0.25);
         if (selectedChar === 'thoai' && player.isThoaiBoosted && now < player.thoaiBoostedEnd) mult *= 2.0;
         if (selectedChar === 'thoai' && player.isThoaiPenalty && now < player.thoaiPenaltyEnd) mult *= 0.5;
+        if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) mult *= 2.5;
+        if (selectedChar === 'trung' && player.isTrungTired && now < player.trungTiredEnd) mult *= 0.5;
     }
     let pSpd = baseSpd * mult;
     if (pSpd > 0) {
-        if (keys.w && !checkCollision(player.x, player.y - pSpd)) player.y -= pSpd;
-        if (keys.s && !checkCollision(player.x, player.y + pSpd)) player.y += pSpd;
-        if (keys.a && !checkCollision(player.x - pSpd, player.y)) player.x -= pSpd;
-        if (keys.d && !checkCollision(player.x + pSpd, player.y)) player.x += pSpd;
+        if (keys.w && !checkCollision(player.x, player.y - pSpd)) {player.y -= pSpd; player.isMoving = true;}
+        if (keys.s && !checkCollision(player.x, player.y + pSpd)) {player.y += pSpd; player.isMoving = true;}
+        if (keys.a && !checkCollision(player.x - pSpd, player.y)) {player.x -= pSpd; player.isMoving = true;}
+        if (keys.d && !checkCollision(player.x + pSpd, player.y)) {player.x += pSpd; player.isMoving = true;}
     }
     // give the player an aura when invincible
     if (player.isInvincible) {
@@ -883,6 +1023,65 @@ function update() {
     }
     if (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd) {
         spawnTrail(player.x, player.y, 'rgba(250,204,21,0.8)');
+    }
+    if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) {
+        spawnTrail(player.x, player.y, 'rgba(56,189,248,0.7)');
+    }
+    if (selectedChar === 'trung' && player.isTrungRasengan && now < player.trungRasenganEnd) {
+        // Rasengan ball follows close to player (offset slightly in movement direction)
+        const rdx = keys.a ? -1 : (keys.d ? 1 : 0);
+        const rdy = keys.w ? -1 : (keys.s ? 1 : 0);
+        const followSpeed = 0.18;
+        const targetX = player.x + (rdx !== 0 || rdy !== 0 ? rdx * 1.0 : 0);
+        const targetY = player.y + (rdx !== 0 || rdy !== 0 ? rdy * 1.0 : 1.0);
+        if (player.isMoving) {
+            player.trungRasenganX += (targetX - player.trungRasenganX) * followSpeed;
+            player.trungRasenganY += (targetY - player.trungRasenganY) * followSpeed;
+        }
+        // Check if rasengan hits any bot
+        bots.forEach(b => {
+            const d = Math.sqrt((b.x - player.trungRasenganX) ** 2 + (b.y - player.trungRasenganY) ** 2);
+            if (d < 0.8 && !b.trungRasenganHit) {
+                b.trungRasenganHit = true;
+                // This bot: 0.25x speed for 30s
+                b.trungRasenganSlowUntil = now + 30000;
+                // Push this bot far
+                const bddx = b.x - player.trungRasenganX, bddy = b.y - player.trungRasenganY;
+                const bd = Math.sqrt(bddx * bddx + bddy * bddy) || 1;
+                b.x = Math.max(1, Math.min(COLS - 2, b.x + (bddx / bd) * 6));
+                b.y = Math.max(1, Math.min(ROWS - 2, b.y + (bddy / bd) * 6));
+                // All other bots: pushed + 0.5x for 3s
+                bots.forEach(ob => {
+                    if (ob !== b) {
+                        const oddx = ob.x - player.trungRasenganX, oddy = ob.y - player.trungRasenganY;
+                        const od = Math.sqrt(oddx * oddx + oddy * oddy) || 1;
+                        ob.x = Math.max(1, Math.min(COLS - 2, ob.x + (oddx / od) * 4));
+                        ob.y = Math.max(1, Math.min(ROWS - 2, ob.y + (oddy / od) * 4));
+                        ob.trungRasenganSlowOtherUntil = now + 3000;
+                    }
+                });
+                shakeAmount = 25;
+                for (let i = 0; i < 10; i++) {
+                    setTimeout(() => spawnShockwave(player.trungRasenganX, player.trungRasenganY, i % 2 ? '#38bdf8' : '#ffffff'), i * 50);
+                }
+                playSound('assets/rasengan-sound-effect.mp3', 0.6);
+                player.isTrungRasengan = false;
+            }
+        });
+        // Resolve bots in walls after push
+        bots.forEach(b => {
+            if (checkCollision(b.x, b.y)) {
+                const dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
+                for (let dist = 0.1; dist < 5; dist += 0.1) {
+                    for (let [ddx, ddy] of dirs) {
+                        if (!checkCollision(b.x + ddx * dist, b.y + ddy * dist)) {
+                            b.x += ddx * dist; b.y += ddy * dist; break;
+                        }
+                    }
+                    if (!checkCollision(b.x, b.y)) break;
+                }
+            }
+        });
     }
     resolveWallStick();
 
@@ -907,6 +1106,9 @@ function update() {
         if (b.quangEarthquakeSlowUntil && now < b.quangEarthquakeSlowUntil && now >= (b.delayUntil || 0)) finalBSpd *= 0.25;
         // Quang [U] gravity frozen (bots can't move)
         if (b.quangGravityUntil && now < b.quangGravityUntil) finalBSpd = 0;
+        // Trung [O] Rasengan: direct hit bot 0.25x for 30s, others 0.5x for 3s
+        if (b.trungRasenganSlowUntil && now < b.trungRasenganSlowUntil) finalBSpd *= 0.25;
+        if (b.trungRasenganSlowOtherUntil && now < b.trungRasenganSlowOtherUntil) finalBSpd *= 0.5;
         if (isLuomCanMove){
             spawnTrail(b.x, b.y, '#ef4444');
         };
@@ -914,7 +1116,6 @@ function update() {
             if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
                 b.delayUntil = now + (isHard ? 3000 : 3500);
                 spawnShockwave(t.x, t.y, '#fff');
-                playSound('assets/ahhhhhhhhhh.mp3', 0.25);
                 traps.splice(idx, 1);
                 b.superEnraged = true;
                 b.superRageStart = now + (isHard ? 3000 : 3500);
@@ -1023,9 +1224,9 @@ function update() {
             playSfx(30, 'sawtooth', 1.0, 0.5, 15);
         }
     });
-    blackholes = blackholes.filter(bh => now < bh.lifeEnd + (bh.isMega ? 500 : 0) && !bh.exploded);
+    blackholes = blackholes.filter(bh => now < bh.lifeEnd && !bh.exploded);
     blackholes.forEach(bh => {
-        bh.radius = Math.min(bh.radius + (bh.isMega ? 0.25 : 0.15), bh.isMega ? 9 : 5);
+        bh.radius = Math.min(bh.radius + 0.25, 8);
         bots.forEach(b => {
             const dx = bh.x - b.x, dy = bh.y - b.y;
             const d = Math.sqrt(dx * dx + dy * dy);
@@ -1177,6 +1378,9 @@ function update() {
     if (now > player.thoaiPenaltyEnd) player.isThoaiPenalty = false;
     if (now > player.quangGravityEnd) player.isQuangGravity = false;
     if (now > player.quangJumpEnd) player.isQuangJumping = false;
+    if (now > player.trungWindGodEnd) { player.isTrungWindGod = false; player.isGhost = false; }
+    if (now > player.trungTiredEnd) player.isTrungTired = false;
+    if (now > player.trungRasenganEnd) player.isTrungRasengan = false;
 
     if (player.isUlt) {
         let color = selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'khang' ? '#fff' : '#6366f1');
@@ -1200,8 +1404,9 @@ function update() {
     if (debugmode) {
         const debug = document.getElementById('debug');
         debug.classList.remove('hidden');
-        debug.innerText = 'X: ' + player.x.toFixed(3) + '; Y: ' + player.y.toFixed(3)
-                        + '\nSpeed: ' + (pSpd);
+        debug.innerText = `X: ${player.x.toFixed(3)} ; Y: ${player.y.toFixed(3)}`
+                        + `\nSpeed: ${pSpd}`
+                        + `\nIsMoving: ${player.isMoving}`;
     }
 }
 
@@ -1313,44 +1518,41 @@ function draw(inRage) {
     const nowDraw = Date.now();
     blackholes.forEach(bh => {
         const cx = bh.x * TILE_SIZE, cy = bh.y * TILE_SIZE;
-        const pulse = 0.7 + 0.3 * Math.sin(nowDraw / (bh.isMega ? 80 : 120));
-        const innerColor = bh.isMega ? 'rgba(76,29,149,0.95)' : 'rgba(124,58,237,0.9)';
-        const glowColor = bh.isMega ? '#1e1b4b' : '#7c3aed';
-        const ringColor = bh.isMega ? `rgba(109, 40, 217, ${0.5 + 0.3 * pulse})` : `rgba(167, 139, 250, ${0.4 + 0.3 * pulse})`;
+        const pulse = 0.7 + 0.3 * Math.sin(nowDraw / 120);
+        const innerColor = 'rgba(76,29,149,0.95)';
+        const glowColor = '#1e1b4b';
+        const ringColor = `rgba(109, 40, 217, ${0.5 + 0.3 * pulse})`;
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, bh.radius * TILE_SIZE);
         grad.addColorStop(0, innerColor);
         grad.addColorStop(0.4, 'rgba(0,0,0,0.85)');
         grad.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.beginPath();
-        ctx.arc(cx, cy, Math.max(bh.radius * TILE_SIZE, TILE_SIZE * (bh.isMega ? 0.8 : 0.5)), 0, Math.PI * 2);
+        ctx.arc(cx, cy, Math.max(bh.radius * TILE_SIZE, TILE_SIZE * 0.8), 0, Math.PI * 2);
         ctx.fillStyle = grad;
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(cx, cy, TILE_SIZE * (bh.isMega ? 0.5 : 0.35) * pulse, 0, Math.PI * 2);
+        ctx.arc(cx, cy, TILE_SIZE * 0.5 * pulse, 0, Math.PI * 2);
         ctx.fillStyle = '#000';
-        ctx.shadowBlur = bh.isMega ? 60 : 30;
+        ctx.shadowBlur = 60;
         ctx.shadowColor = glowColor;
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.rotate(nowDraw / (bh.isMega ? 180 : 300));
+        ctx.rotate(nowDraw / 180);
         ctx.strokeStyle = ringColor;
-        ctx.lineWidth = bh.isMega ? 4 : 2;
+        ctx.lineWidth = 3;
         ctx.setLineDash([4, 6]);
         ctx.beginPath();
-        ctx.arc(0, 0, TILE_SIZE * (bh.isMega ? 1.0 : 0.6), 0, Math.PI * 2);
+        ctx.arc(0, 0, TILE_SIZE * 1.0, 0, Math.PI * 2);
         ctx.stroke();
-        if (bh.isMega) {
-            // Extra outer ring for mega
-            ctx.rotate(-nowDraw / 220);
-            ctx.strokeStyle = `rgba(139,92,246,${0.3 * pulse})`;
-            ctx.lineWidth = 2;
-            ctx.setLineDash([6, 8]);
-            ctx.beginPath();
-            ctx.arc(0, 0, TILE_SIZE * 1.6, 0, Math.PI * 2);
-            ctx.stroke();
-        }
+        ctx.rotate(-nowDraw / 220);
+        ctx.strokeStyle = `rgba(139,92,246,${0.3 * pulse})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 8]);
+        ctx.beginPath();
+        ctx.arc(0, 0, TILE_SIZE * 1.6, 0, Math.PI * 2);
+        ctx.stroke();
         ctx.setLineDash([]);
         ctx.restore();
     });
@@ -1388,7 +1590,7 @@ function draw(inRage) {
     });
     ctx.globalAlpha = 1;
 
-    let pCol = selectedChar === 'khang' ? '#22c55e' : (selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'loi' ? '#6366f1' : (selectedChar === 'thoai' ? '#a78bfa' : (selectedChar === 'quang' ? '#d97706' : '#f97316'))));
+    let pCol = selectedChar === 'khang' ? '#22c55e' : (selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'loi' ? '#6366f1' : (selectedChar === 'thoai' ? '#a78bfa' : (selectedChar === 'quang' ? '#d97706' : (selectedChar === 'trung' ? '#38bdf8' : '#f97316')))));
     if (player.isUlt && selectedChar === 'dang') pCol = '#fbbf24';
     if (player.isDelayed) pCol = '#475569';
     if (player.isParrying) pCol = '#7ec8d5';
@@ -1400,6 +1602,8 @@ function draw(inRage) {
     if (selectedChar === 'thoai' && player.isThoaiPenalty && Date.now() < player.thoaiPenaltyEnd) pCol = '#475569';
     if (selectedChar === 'quang' && player.isQuangGravity && Date.now() < player.quangGravityEnd) pCol = '#c084fc';
     if (selectedChar === 'quang' && player.isQuangJumping && Date.now() < player.quangJumpEnd) pCol = '#fbbf24';
+    if (selectedChar === 'trung' && player.isTrungWindGod && Date.now() < player.trungWindGodEnd) pCol = '#e0f2fe';
+    if (selectedChar === 'trung' && player.isTrungTired && Date.now() < player.trungTiredEnd) pCol = '#475569';
     if (selectedChar === 'tan' && player.isTanSharingan && Date.now() < player.tanSharinganEnd) {
         // Sharingan: tint the whole canvas red
         ctx.save();
@@ -1414,7 +1618,54 @@ function draw(inRage) {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
     }
+    if (selectedChar === 'trung' && player.isTrungWindGod && Date.now() < player.trungWindGodEnd) {
+        // Wind God: tint canvas light blue
+        ctx.save();
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+    }
     drawEntity(player.x, player.y, pCol, (player.isGhost || player.isDelayed) ? 'transparent' : '#454545');
+
+    // Draw Rasengan wind ball
+    if (selectedChar === 'trung' && player.isTrungRasengan && Date.now() < player.trungRasenganEnd) {
+        const rx = player.trungRasenganX * TILE_SIZE;
+        const ry = player.trungRasenganY * TILE_SIZE;
+        const t2 = Date.now();
+        const pulse = 0.7 + 0.3 * Math.sin(t2 / 80);
+        const spin = t2 / 120;
+        // Outer spinning ring
+        ctx.save();
+        ctx.translate(rx, ry);
+        ctx.rotate(spin);
+        ctx.strokeStyle = `rgba(56,189,248,${0.6 + 0.3 * pulse})`;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.arc(0, 0, TILE_SIZE * 0.55, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.rotate(-spin * 2);
+        ctx.strokeStyle = `rgba(186,230,253,${0.4 + 0.3 * pulse})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 7]);
+        ctx.beginPath();
+        ctx.arc(0, 0, TILE_SIZE * 0.35, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        // Core glow
+        const rGrad = ctx.createRadialGradient(rx, ry, 0, rx, ry, TILE_SIZE * 0.4);
+        rGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
+        rGrad.addColorStop(0.3, 'rgba(125,211,252,0.7)');
+        rGrad.addColorStop(1, 'rgba(56,189,248,0)');
+        ctx.beginPath();
+        ctx.arc(rx, ry, TILE_SIZE * 0.4 * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = rGrad;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#38bdf8';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
 
     bots.forEach(b => {
         const now = Date.now();
@@ -1486,7 +1737,7 @@ function resetGameState() {
     alarmSoundPlaying = false;
     player = {
         x: 1.5, y: 1.5,
-        isCoffee: false, isGhost: false, isShield: false, isUlt: false,
+        isMoving: false, isCoffee: false, isGhost: false, isShield: false, isUlt: false,
         ultEnd: 0, roadEnd: 0, shieldEnd: 0, ghostEnd: 0, coffeeEnd: 0,
         khangDashCount: 0, khangTraps: 5,
         isMedalSpeed: false, medalSpeedEnd: 0,
@@ -1507,7 +1758,12 @@ function resetGameState() {
         isThoaiPenalty: false, thoaiPenaltyEnd: 0,
         isQuangJumping: false, quangJumpEnd: 0,
         isQuangGravity: false, quangGravityEnd: 0,
-        isQuangBotSlowed: false, quangBotsuperSlowEnd: 0
+        isTrungWindGod: false, trungWindGodEnd: 0,
+        isTrungTired: false, trungTiredEnd: 0,
+        isTrungHasagi: false, trungHasagiEnd: 0,
+        isTrungDashing: false, trungDashEnd: 0,
+        isTrungRasengan: false, trungRasenganEnd: 0,
+        trungRasenganX: 0, trungRasenganY: 0
     };
     document.getElementById('warning-flash').classList.remove('delay-warning');
     document.getElementById('warning-flash').classList.remove('slow-warning');
@@ -1538,8 +1794,8 @@ function returnToGame() {
 
 window.selectChar = (c) => {
     selectedChar = c;
-    const colors = { khang: '#22c55e', dang: '#06b6d4', loi: '#6366f1', tan: '#f97316', thoai: '#a78bfa', quang: '#d97706' };
-    const charOrder = ['khang', 'dang', 'loi', 'tan', 'thoai', 'quang'];
+    const colors = { khang: '#22c55e', dang: '#06b6d4', loi: '#6366f1', tan: '#f97316', thoai: '#a78bfa', quang: '#d97706', trung: '#38bdf8' };
+    const charOrder = ['khang', 'dang', 'loi', 'tan', 'thoai', 'quang', 'trung'];
     
     // Update tab buttons
     charOrder.forEach((id, index) => {
@@ -1547,13 +1803,13 @@ window.selectChar = (c) => {
         if (!tab) return;
         if (id === c) {
             tab.classList.remove('border-slate-700');
-            tab.classList.add(`border-${id === 'khang' ? 'green-400' : id === 'dang' ? 'cyan-400' : id === 'loi' ? 'indigo-400' : id === 'tan' ? 'orange-400' : id === 'thoai' ? 'violet-300' : 'amber-500'}`);
+            tab.classList.add(`border-${id === 'khang' ? 'green-400' : id === 'dang' ? 'cyan-400' : id === 'loi' ? 'indigo-400' : id === 'tan' ? 'orange-400' : id === 'thoai' ? 'violet-300' : id === 'trung' ? 'sky-400' : 'amber-500'}`);
             tab.style.transform = 'scale(1.25)';
             tab.style.padding = '3px';
             tab.style.boxShadow = `0 0 25px ${colors[id]}`;
         } else {
             tab.classList.add('border-slate-700');
-            tab.classList.remove('border-green-400', 'border-cyan-400', 'border-indigo-400', 'border-orange-400', 'border-violet-300', 'border-amber-500');
+            tab.classList.remove('border-green-400', 'border-cyan-400', 'border-indigo-400', 'border-orange-400', 'border-violet-300', 'border-amber-500', 'border-sky-400');
             tab.style.transform = 'scale(1)';
             tab.style.padding = '0px';
             tab.style.boxShadow = 'none';
@@ -1577,7 +1833,7 @@ window.selectChar = (c) => {
 };
 
 window.changeCharTab = (dir) => {
-    const charOrder = ['khang', 'dang', 'loi', 'tan', 'thoai', 'quang'];
+    const charOrder = ['khang', 'dang', 'loi', 'tan', 'thoai', 'quang', 'trung'];
     const currentIndex = charOrder.indexOf(selectedChar);
     let newIndex = currentIndex + dir;
     if (newIndex < 0) newIndex = charOrder.length - 1;
@@ -1638,7 +1894,7 @@ window.addEventListener('keyup', e => {
 var fpsOut = document.getElementById('fps-counter');
 setInterval(function(){
     fpsOut.innerHTML = (frameTime ? Math.round(1000/frameTime) : "-") + " fps";
-}, 1000);
+}, 500);
 window.addEventListener('resize', initCanvas);
 document.getElementById('vers').innerText = 'V' + version;
 selectChar('khang');

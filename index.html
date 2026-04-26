@@ -92,6 +92,12 @@
                         <p class="text-xs text-amber-500 font-bold mb-1">Quang 180</p>
                     </div>
                 </div>
+                <div class="relative group">
+                    <button onclick="selectChar('trung')" class="char-tab w-10 h-10 rounded-full bg-sky-400 text-black font-bold text-sm border-2 border-slate-700 hover:scale-110 transition-all">🌀</button>
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-24 p-2 bg-slate-900 border border-sky-400 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                        <p class="text-xs text-sky-300 font-bold mb-1">Trung Béo</p>
+                    </div>
+                </div>
             </div>
             
             <button id="char-next" onclick="changeCharTab(1)" class="w-12 h-12 rounded-full bg-slate-800 border-2 border-slate-600 text-white font-bold text-2xl hover:border-green-500 hover:bg-green-500/20 transition-all flex items-center justify-center">&gt;</button>
@@ -110,10 +116,10 @@
                         </div>
                     </div>
                     <div class="text-left">
-                        <p class="skill-text"><b class="text-white">[Y] Dash:</b> Lướt. (x2 khi Ult)</p>
+                        <p class="skill-text"><b class="text-white">[Y] Dash:</b> Lướt về phía trước. (x2 khi Ult)</p>
                         <p class="skill-text"><b class="text-white">[U] Freeze:</b> Dừng thời gian.</p>
                         <p class="skill-text"><b class="text-white">[I] Trap:</b> Đặt 1 bẫy tại chỗ.</p>
-                        <p class="skill-text"><b class="text-yellow-500">[O] Ult:</b> x3 Speed & 5 Bẫy.</p>
+                        <p class="skill-text"><b class="text-yellow-500">[O] Ninja:</b> x3 Speed & +5 Bẫy.</p>
                     </div>
                 </div>
             </div>
@@ -131,7 +137,7 @@
                         <p class="skill-text"><b class="text-white">[Y] Coffee:</b> Tăng tốc và đọc map.</p>
                         <p class="skill-text"><b class="text-white">[U] Punch:</b> Đấm về phía trước.</p>
                         <p class="skill-text"><b class="text-white">[I] Parry:</b> Đỡ đòn và phản công bot.</p>
-                        <p class="skill-text"><b class="text-yellow-500">[O] Ult:</b> 3x Speed & Xuyên Bot.</p>
+                        <p class="skill-text"><b class="text-yellow-500">[O] Dodge:</b> 2.75x Speed & Di chuyển xuyên Bot.</p>
                     </div>
                 </div>
             </div>
@@ -149,7 +155,7 @@
                         <p class="skill-text"><b class="text-white">[Y] Blink:</b> Dịch chuyển về phía trước.</p>
                         <p class="skill-text"><b class="text-white">[U] Boost:</b> Dừng bot và tăng tốc.</p>
                         <p class="skill-text"><b class="text-white">[I] Decoy:</b> Tạo mồi nhử tại chỗ.</p>
-                        <p class="skill-text"><b class="text-yellow-500">[O] Ult:</b> Đẩy lùi toàn map.</p>
+                        <p class="skill-text"><b class="text-yellow-500">[O] Bang:</b> Đẩy lùi bot toàn map.</p>
                     </div>
                 </div>
             </div>
@@ -167,7 +173,7 @@
                         <p class="skill-text"><b class="text-white">[Y] God Mode:</b> 2x tốc độ & bất tử 5s.</p>
                         <p class="skill-text"><b class="text-white">[U] Sharingan:</b> Màn đỏ, đóng băng bot 5s.</p>
                         <p class="skill-text"><b class="text-white">[I] Delete:</b> Xóa sổ tất cả thực thể.</p>
-                        <p class="skill-text"><b class="text-yellow-500">[O] Ult:</b> Hunter mode - tiêu diệt & +0.25x tốc độ (2.5x MAX).</p>
+                        <p class="skill-text"><b class="text-yellow-500">[O] Hunter Time:</b> Tiêu diệt bot & +0.25x tốc độ (2.5x MAX).</p>
                     </div>
                 </div>
             </div>
@@ -202,8 +208,26 @@
                     <div class="text-left">
                         <p class="skill-text"><b class="text-white">[Y] Địa Chấn:</b> Rung màn hình, bot delay 3s & 0.25x/2s.</p>
                         <p class="skill-text"><b class="text-white">[U] Hấp Dẫn:</b> Tạo ra "lực hấp dẫn" riêng và hấp thụ bot.</p>
-                        <p class="skill-text"><b class="text-white">[I] Hố Đen:</b> Hố đen siêu mạnh 3s, nổ tung bot toàn map 0.5x/2s.</p>
+                        <p class="skill-text"><b class="text-white">[I] Ợ Hơi:</b> Đẩy lùi mọi bot xung quanh và làm chậm.</p>
                         <p class="skill-text"><b class="text-yellow-500">[O] Nhảy:</b> Nhảy khỏi map và phá hủy mọi thứ khi tiếp đất.</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Trung Béo -->
+            <div id="char-display-trung" class="char-display hidden">
+                <div class="p-6 rounded-2xl border-2 border-sky-400 bg-sky-400/10">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-16 h-16 bg-sky-400 rounded-2xl flex items-center justify-center text-4xl font-black shadow-[0_0_30px_rgba(56,189,248,0.5)] text-black">🌀</div>
+                        <div class="text-left">
+                            <h2 class="text-2xl font-bold uppercase text-sky-300">Trung Béo</h2>
+                            <p class="text-sm text-slate-400">Nhân vật con của thần gió</p>
+                        </div>
+                    </div>
+                    <div class="text-left">
+                        <p class="skill-text"><b class="text-white">[Y] Con Của Thần Gió:</b> 2.5x tốc độ & xuyên bot 5s.</p>
+                        <p class="skill-text"><b class="text-white">[U] Hasagi:</b> Sóng xung kích đẩy tất cả bot xuyên mê cung.</p>
+                        <p class="skill-text"><b class="text-white">[I] Lát Cắt Nguyên Tử:</b> Dash & tiêu diệt bot trên đường đi.</p>
+                        <p class="skill-text"><b class="text-yellow-500">[O] Rasengan:</b> Tạo cầu gió và cản trở bot.</p>
                     </div>
                 </div>
             </div>
