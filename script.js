@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 3)";
+const version = "1.2 (preview, build 4)";
 const debugmode = true;
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
@@ -49,12 +49,12 @@ var filterStrength = 20;
 var frameTime = 0, lastLoop = new Date, thisLoop;
 
 const COOLDOWNS = {
-    khang: { y: 3500, u: 12000, i: 5000, o: 20000 },
+    khang: { y: 4000, u: 12000, i: 3000, o: 18000 },
     dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
     loi: { y: 6000, u: 12000, i: 6000, o: 18000 },
     tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
     thoai: { y: 6000, u: 7000, i: 11000, o: 25000 },
-    quang: { y: 10000, u: 14000, i: 25000, o: 25000 }
+    quang: { y: 12000, u: 1500, i: 18000, o: 25000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -186,9 +186,9 @@ function initCanvas() {
 }
 
 function generateMaze() {
-    const baseSize = gameMode === 'normal' ? [13, 21] : [17, 31];
-    ROWS = baseSize[0] + (currentLevel === 1 ? 0 : (currentLevel === 2 ? 4 : 8));
-    COLS = baseSize[1] + (currentLevel === 1 ? 0 : (currentLevel === 2 ? 6 : 12));
+    const baseSize = gameMode === 'normal' ? [15, 25] : [17, 29];
+    ROWS = baseSize[0] + [0, 4, 8, 12, 16][currentLevel-1];
+    COLS = baseSize[1] + [0, 6, 12, 18, 24][currentLevel-1];
 
     initCanvas();
     maze = Array(ROWS).fill().map(() => Array(COLS).fill('#'));
@@ -290,20 +290,20 @@ function useY() {
         const isUlt = player.isUlt;
         let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
         if (!dx && !dy) dy = -1;
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 10; i++) {
             let nx = player.x + dx * 0.4, ny = player.y + dy * 0.4;
             if (!checkCollision(nx, ny)) {
                 spawnTrail(player.x, player.y, isUlt ? 'rgba(255,255,255,0.6)' : 'rgba(34,197,94,0.3)');
                 player.x = nx;
                 player.y = ny;
-            }
+            } else break;
         }
         if (isUlt) {
             player.khangDashCount++;
             if (player.khangDashCount < 2) yCD = now + 400;
             else { player.khangDashCount = 0; yCD = now + 1500 * (selectedBot === 'anh' ? 1.5 : 1); }
         } else yCD = now + COOLDOWNS.khang.y * (selectedBot === 'anh' ? 1.5 : 1);
-        playSfx(600, 'sine', 0.2);
+        playSound(`assets/dash${Math.random() < 0.5 ? 1 : 2}.mp3`);
     } else if (selectedChar === 'dang') {
         player.isCoffee = true;
         player.coffeeEnd = now + 4000;
@@ -629,7 +629,7 @@ function useO() {
         }
     } else if (selectedChar === 'khang') {
         player.isUlt = true;
-        player.ultEnd = now + 6000;
+        player.ultEnd = now + 5000;
         playSound('assets/lets-go.mp3', 1);
         iCD = now;
         player.khangTraps = 5;
@@ -695,7 +695,7 @@ function useO() {
         player.quangJumpEnd = now + 1000;
         player.isInvincible = true;
         player.invincibleEnd = now + 1000;
-        playSound('assets/wee.mp3', 0.8);
+        playSound('assets/wee.mp3', 0.4);
         setTimeout(() => {
             player.isSlow = true;
             player.slowEnd = now + 700;
@@ -755,9 +755,9 @@ function update() {
     }
     // Lerm movement
     let isLuomCanMove = false;
-    let tick = 550 - currentLevel * 25 - (isCommonRage ? 8 * currentLevel : 0) - (isHard ? 5 * currentLevel : 3 * currentLevel);
+    let tick = 500 - currentLevel * 22.5 - (isCommonRage ? 8 * currentLevel : 0) - (isHard ? 5 * currentLevel : 3 * currentLevel);
     if (selectedBot === 'luom' && elapsed > tick) {
-        const luomDur = (isHard ? 75 : 50) + (isCommonRage ? (isHard ? 12 : 6) * currentLevel : 0);
+        const luomDur = (isHard ? 85 : 65) + (isCommonRage ? (isHard ? 10 : 8) * currentLevel : 0);
         if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0) {
             isLuomCanMove = true;
             playSound('assets/ruler-slap.mp3', 0.15);
@@ -794,7 +794,7 @@ function update() {
         } else if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#f97316';
-            statusEl.innerText = `🔥 HUNTER MODE! KILLS: ${player.countKills} (+${player.countKills * 25}% SPD)`;
+            statusEl.innerText = `🔥 HUNTER MODE! KILLS: ${player.countKills}`;
         } else if (selectedChar === 'thoai' && player.isThoaiSlow && now < player.thoaisuperSlowEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#a78bfa';
@@ -841,7 +841,7 @@ function update() {
     }
 
     // PLAYER MOVE
-    let baseSpd = isHard ? 0.135 : 0.065 + ((isHard ? 0.0675 : 0.0125) * currentLevel);
+    let baseSpd = isHard ? 0.12 : 0.06 + ((isHard ? 0.05 : 0.015) * currentLevel);
     let mult = 1;
     if (player.isParrySuccess) {
         player.isFast = true;
@@ -857,7 +857,7 @@ function update() {
         if (player.isMedalSpeed) mult *= 2.0;
         if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.6);
         if (player.isSuperSlow && now < player.superSlowEnd) mult *= 0.25;
-        if (player.isSlow && now < player.slowEnd) mult *= 0.5;
+        if (player.isSlow && now < player.slowEnd) mult *= 0.525;
         if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) mult *= 2.0;
         if (selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd)
             mult *= (1.0 + player.tanUltKills * 0.25);
@@ -894,17 +894,12 @@ function update() {
 
     bots.forEach(b => {
         if (b.x <= 0 || b.x > COLS - 1 || b.y <= 0 || b.y > ROWS - 1) {
-            bots.splice(bots.indexOf(b), 1);
-            // reduce player cooldowns
-            yCD = Math.max(yCD - COOLDOWNS[selectedChar].y * (selectedBot === 'anh' ? 1.5 : 1) / 1.25, now);
-            uCD = Math.max(uCD - COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1) / 1.25, now);
-            iCD = Math.max(iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 1.25, now);
-            oCD = Math.max(oCD - COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1) / 1.25, now);
+            b.isDead = true;
             return;
         }
         const superEnraged = (now > b.superRageStart && now < b.superRageEnd) && isRageable;
         let finalBSpd = bSpdBase;
-        if (superEnraged) finalBSpd *= (selectedBot === 'luom' ? 3.45 : 3.0);
+        if (superEnraged) finalBSpd *= (selectedBot === 'luom' ? 4.0 : 3.0);
         else if (isCommonRage) finalBSpd *= 2.0;
         // Thoai [Y]: slow bots
         if (selectedChar === 'thoai' && b.thoaiSlowUntil && now < b.thoaiSlowUntil) finalBSpd *= 0.25;
@@ -917,13 +912,13 @@ function update() {
         };
         traps.forEach((t, idx) => {
             if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
-                b.delayUntil = now + (isHard ? 2000 : 3000);
+                b.delayUntil = now + (isHard ? 3000 : 3500);
                 spawnShockwave(t.x, t.y, '#fff');
                 playSound('assets/ahhhhhhhhhh.mp3', 0.25);
                 traps.splice(idx, 1);
                 b.superEnraged = true;
-                b.superRageStart = now + (isHard ? 2000 : 3000);
-                b.superRageEnd = now + (isHard ? 2000 : 3000) + 5000;
+                b.superRageStart = now + (isHard ? 3000 : 3500);
+                b.superRageEnd = now + (isHard ? 3000 : 3500) + 5000;
             }
         });
 
@@ -945,7 +940,6 @@ function update() {
         if (Math.sqrt((player.x - b.x) ** 2 + (player.y - b.y) ** 2) < 0.5) {
             if ((selectedChar === 'tan' && player.isTanUlt && now < player.tanUltEnd) ||
                 (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd)) {
-                player.countKills++;
                 spawnShockwave(b.x, b.y, '#facc15');
                 spawnShockwave(b.x, b.y, '#ef4444');
                 shakeAmount = 15;
@@ -955,6 +949,9 @@ function update() {
                 player.isShield = false;
                 b.delayUntil = now + (isHard ? 2500 : 3500);
                 spawnShockwave(player.x, player.y, '#fbbf24');
+            } else if (player.isQuangGravity && now < player.quangGravityEnd) {
+                b.isDead = true;
+                playSound('assets/nom.mp3');
             } else if (player.isParrying && now < player.parryEnd) {
                 freezeEnd = now + 2500;
                 player.isInvincible = true;
@@ -991,20 +988,27 @@ function update() {
                     parry.classList.add('hidden');
                     parry.style.transition = 'none';
                 }, 600);
-                // play custom parry sfx in assets
                 playSound('assets/parry.mp3');
-            } else if (!player.isGhost && freezeEnd < now && !player.isInvincible && !player.isTanGod) {
+            } else if (freezeEnd < now && !player.isInvincible && !player.isTanGod && !player.isGhost && !player.isQuangJumping) {
                 endGame(false, selectedBot);
                 playSound('assets/kill.mp3');
             }
         }
     });
+    let lpbots = bots.length;
     bots = bots.filter(b => !b.isDead);
-
+    if (lpbots > bots.length){
+        player.countKills = lpbots - bots.length
+        yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * 0.3 * player.countKills);
+        uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * 0.3 * player.countKills);
+        iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * 0.3 * player.countKills);
+        oCD = Math.max(now, oCD - COOLDOWNS[selectedChar].o * 0.3 * player.countKills);
+        player.countKills = 0;
+    }
     // BLACK HOLE update (Thoai [O] and Quang [I])
     // Handle mega black hole explosion before filter
     blackholes.forEach(bh => {
-        if (bh.isMega && !bh.exploded && now >= bh.lifeEnd) {
+        if (!bh.exploded && now >= bh.lifeEnd) {
             bh.exploded = true;
             // Explode: slow all bots 0.5x for 2s
             bots.forEach(b => {
@@ -1041,7 +1045,6 @@ function update() {
 
     if (selectedChar === 'quang' && player.isQuangJumping && now >= player.quangJumpEnd) {
         player.isQuangJumping = false;
-        // Break 3x3 blocks around player (turn walls into open paths)
         const px = Math.floor(player.x), py = Math.floor(player.y);
         for (let dy = -1; dy <= 1; dy++) {
             for (let dx2 = -1; dx2 <= 1; dx2++) {
@@ -1054,7 +1057,7 @@ function update() {
         for (let i = 0; i < 5; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, i % 2 ? '#c1c1c1' : '#a6a6a6');
-                if (i < 6) shakeAmount = Math.max(shakeAmount, 15);
+                shakeAmount = 50 - i * 10;
             }, i * 50);
         }
         shakeAmount = 250;
@@ -1071,6 +1074,18 @@ function update() {
                 }
             }
         }
+        const fpx = Math.floor(player.x), fpy = Math.floor(player.y);
+        bots.forEach(b => {
+            const bx = Math.floor(b.x), by = Math.floor(b.y);
+            if (Math.abs(bx - fpx) <= 1 && Math.abs(by - fpy) <= 1) {
+                b.isDead = true;
+                spawnShockwave(b.x, b.y, '#d97706');
+                spawnShockwave(b.x, b.y, '#fbbf24');
+                shakeAmount = 15;
+                playSound('assets/kill.mp3', 0.8);
+            }
+        });
+
         if (Math.floor(player.x) > COLS - 2) player.x = COLS - 2;
         if (Math.floor(player.y) > ROWS - 2) player.y = ROWS - 2;
     }
@@ -1081,6 +1096,17 @@ function update() {
         if (Math.floor(now / 300) !== Math.floor((now - 16) / 300)) {
             spawnShockwave(player.x, player.y, 'rgba(139,92,246,0.5)');
         }
+        // pulling logic: pull all bots toward player
+        bots.forEach(b => {
+            const dx = player.x - b.x;
+            const dy = player.y - b.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 0.5) {
+                const pullStrength = 0.08;
+                b.x += (dx / dist) * pullStrength;
+                b.y += (dy / dist) * pullStrength;
+            }
+        });
     }
 
     // LEVELING
@@ -1098,13 +1124,14 @@ function update() {
             player.x = 1.5;
             player.y = 1.5;
             // reduce player CDs
-            yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * 0.2);
-            uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * 0.2);
-            iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * 0.2);
-            oCD = Math.max(now, oCD - COOLDOWNS[selectedChar].o * 0.2);
+            yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * 0.25);
+            uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * 0.25);
+            iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * 0.25);
+            oCD = Math.max(now, oCD - COOLDOWNS[selectedChar].o * 0.25);
             if (selectedChar === 'khang' && player.isUlt) {
                 iCD = now;
-                player.khangTraps = 5;
+                player.khangTraps += 5;
+                player.ultEnd = now + 5000;
                 document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: 5`;
             }
             playSound('assets/newlevel.mp3');
@@ -1219,7 +1246,7 @@ function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false) {
         ctx.save();
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.beginPath();
-        ctx.ellipse(x * TILE_SIZE, y * TILE_SIZE + TILE_SIZE * 0.35, jumpSize * 0.4, jumpSize * 0.15, 0, 0, Math.PI * 2);
+        ctx.ellipse(x * TILE_SIZE, y * TILE_SIZE + TILE_SIZE * 0.25, jumpSize * 0.4, jumpSize * 0.15, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
         
