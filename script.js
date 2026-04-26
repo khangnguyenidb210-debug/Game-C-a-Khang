@@ -661,6 +661,8 @@ function useI() {
         playSound('assets/motcaichettruyenthong.mp3', 0.67);
     } else if (selectedChar === 'quang') {
         playSound('assets/burps.mp3', 0.7);
+        player.isSlow = true;
+        player.slowEnd = now + 1000;
         for (let i = 0; i < 10; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, i % 2 ? '#33d87d' : '#20e820');
@@ -673,7 +675,8 @@ function useI() {
             const pushDist = 5;
             b.x = Math.max(1, Math.min(COLS - 2, b.x + (dx / d) * pushDist));
             b.y = Math.max(1, Math.min(ROWS - 2, b.y + (dy / d) * pushDist));
-            b.slowEnd = now + 2500;
+            b.slowEnd = now + 3500;
+            b.delayUntil = now + 1000;
         });
         bots.forEach(b => {
             if (checkCollision(b.x, b.y)) {
@@ -1200,10 +1203,11 @@ function update() {
     bots = bots.filter(b => !b.isDead);
     if (lpbots > bots.length){
         player.countKills = lpbots - bots.length
-        yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * 0.3 * player.countKills);
-        uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * 0.3 * player.countKills);
-        iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * 0.3 * player.countKills);
-        oCD = Math.max(now, oCD - COOLDOWNS[selectedChar].o * 0.3 * player.countKills);
+        const kmult = (selectedChar === 'quang' ? 0.05 : 0.25) * player.countKills;
+        yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * kmult);
+        uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * kmult);
+        iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * kmult);
+        oCD = Math.max(now, oCD - COOLDOWNS[selectedChar].o * kmult);
         player.countKills = 0;
     }
     // BLACK HOLE update (Thoai [O] and Quang [I])
