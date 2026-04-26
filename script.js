@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 4)";
+const version = "1.2 (preview, build 5)";
 const debugmode = true;
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
@@ -54,7 +54,7 @@ const COOLDOWNS = {
     loi: { y: 6000, u: 12000, i: 6000, o: 18000 },
     tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
     thoai: { y: 6000, u: 7000, i: 11000, o: 25000 },
-    quang: { y: 12000, u: 1500, i: 18000, o: 25000 }
+    quang: { y: 12000, u: 15000, i: 18000, o: 25000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -1638,7 +1638,7 @@ window.addEventListener('keyup', e => {
 var fpsOut = document.getElementById('fps-counter');
 setInterval(function(){
     fpsOut.innerHTML = (frameTime ? Math.round(1000/frameTime) : "-") + " fps";
-}, 500);
+}, 1000);
 window.addEventListener('resize', initCanvas);
 document.getElementById('vers').innerText = 'V' + version;
 selectChar('khang');
