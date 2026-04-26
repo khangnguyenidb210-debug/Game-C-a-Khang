@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 5)";
+const version = "1.2 (preview, build 6)";
 const debugmode = true;
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
@@ -59,7 +59,7 @@ const COOLDOWNS = {
     loi: { y: 6000, u: 12000, i: 6000, o: 18000 },
     tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
     thoai: { y: 6000, u: 7000, i: 11000, o: 25000 },
-    quang: { y: 14000, u: 14000, i: 12000, o: 28000 },
+    quang: { y: 12000, u: 20000, i: 12000, o: 25000 },
     trung: { y: 15000, u: 14000, i: 8000, o: 18000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
@@ -113,6 +113,7 @@ function shiftTimers(delta) {
         b.superRageStart += delta;
         b.superRageEnd += delta;
         b.rageUntil += delta;
+        b.slowEnd += delta;
     });
 }
 
@@ -381,10 +382,10 @@ function useY() {
                 spawnShockwave(player.x, player.y, i % 2 ? '#a16207' : '#78350f');
             }, i * 150);
         }
-        playSfx(60, 'sawtooth', 0.6, 0.3, 30);
+        playSound('assets/stomp.mp3', 0.7);
         bots.forEach(b => {
-            b.delayUntil = now + 3000;
-            b.quangEarthquakeSlowUntil = now + 5000;
+            b.delayUntil = now + 4500;
+            b.quangEarthquakeSlowUntil = now + 4500;
         });
         yCD = now + COOLDOWNS.quang.y * (selectedBot === 'anh' ? 1.5 : 1);
     } else if (selectedChar === 'trung') {
@@ -529,10 +530,9 @@ function useU() {
         player.superSlowEnd = now + 2000;
         player.isQuangGravity = true;
         player.quangGravityEnd = now + 5000;
-        // Pull all bots toward player center (gravitational effect)
         bots.forEach(b => {
-            b.delayUntil = now + 5000;
-            b.quangGravityUntil = now + 5000;
+            b.delayUntil = now + 3000;
+            b.quangGravityUntil = now + 3000;
         });
         // Spawn pulsing purple shockwaves
         for (let i = 0; i < 14; i++) {
@@ -675,6 +675,7 @@ function useI() {
             const pushDist = 5;
             b.x = Math.max(1, Math.min(COLS - 2, b.x + (dx / d) * pushDist));
             b.y = Math.max(1, Math.min(ROWS - 2, b.y + (dy / d) * pushDist));
+            b.isSlow = true;
             b.slowEnd = now + 3500;
             b.delayUntil = now + 1000;
         });
@@ -808,13 +809,13 @@ function useO() {
     } else if (selectedChar === 'quang') {
         // EARTHQUAKE JUMP: jump and destroy 3x3 blocks when landing
         player.isQuangJumping = true;
-        player.quangJumpEnd = now + 1000;
+        player.quangJumpEnd = now + 1500;
         player.isInvincible = true;
-        player.invincibleEnd = now + 1150;
+        player.invincibleEnd = now + 1700;
         playSound('assets/wee.mp3', 0.4);
         setTimeout(() => {
             player.isSlow = true;
-            player.slowEnd = now + 700;
+            player.slowEnd = now + 1200;
         }, 150);
     } else if (selectedChar === 'trung') {
         // RASENGAN: spawn wind ball that follows player for 5s
@@ -884,11 +885,11 @@ function update() {
     // Lerm movement
     let isLuomCanMove = false;
     let tick = 500 - currentLevel * 22.5 - (isCommonRage ? 8 * currentLevel : 0) - (isHard ? 5 * currentLevel : 3 * currentLevel);
-    if (selectedBot === 'luom' && elapsed > tick) {
+    if (selectedBot === 'luom' && elapsed > tick && !(player.isQuangGravity && now < player.quangGravityEnd)) {
         const luomDur = (isHard ? 85 : 65) + (isCommonRage ? (isHard ? 10 : 8) * currentLevel : 0);
         if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0) {
             isLuomCanMove = true;
-            playSound('assets/ruler-slap.mp3', 0.15);
+            playSound('assets/ruler-slap.mp3', 0.075);
         }
     }
 
@@ -984,6 +985,7 @@ function update() {
     let baseSpd = isHard ? 0.12 : 0.06 + ((isHard ? 0.05 : 0.015) * currentLevel);
     let mult = 1;
     player.isMoving = false;
+    if (selectedChar === 'quang') mult *= 0.75;
     if (player.isParrySuccess) {
         player.isFast = true;
         player.fastEnd = now + 1500;
@@ -1103,12 +1105,14 @@ function update() {
         let finalBSpd = bSpdBase;
         if (superEnraged) finalBSpd *= (selectedBot === 'luom' ? 4.0 : 3.0);
         else if (isCommonRage) finalBSpd *= 2.0;
+        if (b.isSlow) finalBSpd *= 0.35;
         // Thoai [Y]: slow bots
         if (selectedChar === 'thoai' && b.thoaiSlowUntil && now < b.thoaiSlowUntil) finalBSpd *= 0.25;
         // Quang [Y] earthquake slow (0.25x for 2s after 3s delay)
         if (b.quangEarthquakeSlowUntil && now < b.quangEarthquakeSlowUntil && now >= (b.delayUntil || 0)) finalBSpd *= 0.25;
         // Quang [U] gravity frozen (bots can't move)
         if (b.quangGravityUntil && now < b.quangGravityUntil) finalBSpd = 0;
+        if (now >= b.slowEnd) b.isSlow = false;
         // Trung [O] Rasengan: direct hit bot 0.25x for 30s, others 0.5x for 3s
         if (b.trungRasenganSlowUntil && now < b.trungRasenganSlowUntil) finalBSpd *= 0.25;
         if (b.trungRasenganSlowOtherUntil && now < b.trungRasenganSlowOtherUntil) finalBSpd *= 0.5;
@@ -1203,7 +1207,7 @@ function update() {
     bots = bots.filter(b => !b.isDead);
     if (lpbots > bots.length){
         player.countKills = lpbots - bots.length
-        const kmult = (selectedChar === 'quang' ? 0.05 : 0.25) * player.countKills;
+        const kmult = (selectedChar === 'quang' ? 0.025 : 0.25) * player.countKills;
         yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * kmult);
         uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * kmult);
         iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * kmult);
@@ -1250,6 +1254,8 @@ function update() {
 
     if (selectedChar === 'quang' && player.isQuangJumping && now >= player.quangJumpEnd) {
         player.isQuangJumping = false;
+        if (Math.floor(player.x) > COLS - 2) player.x = COLS - 2;
+        if (Math.floor(player.y) > ROWS - 2) player.y = ROWS - 2;
         const px = Math.floor(player.x), py = Math.floor(player.y);
         for (let dy = -1; dy <= 1; dy++) {
             for (let dx2 = -1; dx2 <= 1; dx2++) {
@@ -1290,9 +1296,6 @@ function update() {
                 playSound('assets/kill.mp3', 0.8);
             }
         });
-
-        if (Math.floor(player.x) > COLS - 2) player.x = COLS - 2;
-        if (Math.floor(player.y) > ROWS - 2) player.y = ROWS - 2;
     }
 
     // QUANG GRAVITY VISUAL: pull bots toward player while gravity active
