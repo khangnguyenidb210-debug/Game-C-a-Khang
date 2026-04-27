@@ -3,8 +3,19 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 6)";
+const version = "1.2 (preview, build 7)";
 const debugmode = true;
+
+// GAME CONFIG - Tùy chỉnh tốc độ game - WIP
+const TARGET_FPS = 144; // Tần số quét mục tiêu (30, 60, 120, 144, etc.)
+const TARGET_FRAME_TIME = 1000 / TARGET_FPS; // Thời gian mỗi frame (ms)
+
+// Visual Effects Config - WIP
+const ENABLE_SHADOW_EFFECTS = false; // Bật/tắt shadow blur (tắt để tăng FPS)
+const MAX_SHOCKWAVES = 25; // Giới hạn shockwaves
+const MAX_TRAILS = 20; // Giới hạn trails
+const MAX_PARTICLES = 50; // Giới hạn particles
+
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
 
@@ -53,6 +64,8 @@ let isRaging = false;
 
 var filterStrength = 20;
 var frameTime = 0, lastLoop = new Date, thisLoop;
+var lastUpdateTime = 0, deltaTime = 0;
+let mazeCache = null, mazeCacheRage = null; // Cache for rendered maze
 
 const COOLDOWNS = {
     khang: { y: 4000, u: 12000, i: 3000, o: 18000 },
@@ -219,6 +232,78 @@ function generateMaze() {
     }
     walk(1, 1);
     maze[ROWS - 2][COLS - 2] = 'K';
+    
+    // Create maze cache for performance
+    createMazeCache();
+}
+
+function createMazeCache() {
+    // Create an offscreen canvas to cache the maze
+    mazeCache = document.createElement('canvas');
+    mazeCache.width = canvas.width;
+    mazeCache.height = canvas.height;
+    const cacheCtx = mazeCache.getContext('2d');
+    
+    // Draw all static maze elements to cache
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            if (maze[r][c] === '#') {
+                let grad = cacheCtx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
+                grad.addColorStop(0, '#222c3c');
+                grad.addColorStop(1, '#020617');
+                cacheCtx.fillStyle = grad;
+                cacheCtx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            } else if (maze[r][c] === 'a') {
+                let grad = cacheCtx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
+                grad.addColorStop(0, '#ffae00');
+                grad.addColorStop(1, '#b6ae25');
+                cacheCtx.fillStyle = grad;
+                cacheCtx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            } else if (maze[r][c] === 'K') {
+                cacheCtx.fillStyle = '#eab308';
+                cacheCtx.shadowBlur = 20;
+                cacheCtx.shadowColor = '#eab308';
+                cacheCtx.beginPath();
+                cacheCtx.arc(c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+                cacheCtx.fill();
+                cacheCtx.shadowBlur = 0;
+            }
+        }
+    }
+}
+
+function createMazeCacheRage() {
+    // Create rage version of maze cache
+    mazeCacheRage = document.createElement('canvas');
+    mazeCacheRage.width = canvas.width;
+    mazeCacheRage.height = canvas.height;
+    const cacheCtx = mazeCacheRage.getContext('2d');
+    
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            if (maze[r][c] === '#') {
+                let grad = cacheCtx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
+                grad.addColorStop(0, '#450a0a');
+                grad.addColorStop(1, '#020617');
+                cacheCtx.fillStyle = grad;
+                cacheCtx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            } else if (maze[r][c] === 'a') {
+                let grad = cacheCtx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
+                grad.addColorStop(0, '#ffae00');
+                grad.addColorStop(1, '#b6ae25');
+                cacheCtx.fillStyle = grad;
+                cacheCtx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            } else if (maze[r][c] === 'K') {
+                cacheCtx.fillStyle = '#eab308';
+                cacheCtx.shadowBlur = 20;
+                cacheCtx.shadowColor = '#eab308';
+                cacheCtx.beginPath();
+                cacheCtx.arc(c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+                cacheCtx.fill();
+                cacheCtx.shadowBlur = 0;
+            }
+        }
+    }
 }
 
 /**
@@ -256,11 +341,17 @@ function resolveWallStick() {
  * VISUAL FX
  */
 function spawnShockwave(x, y, color) {
-    shockwaves.push({ x: x * TILE_SIZE, y: y * TILE_SIZE, r: 0, life: 1.0, color: color });
+    // Limit shockwave creation to prevent performance issues
+    if (shockwaves.length < MAX_SHOCKWAVES) {
+        shockwaves.push({ x: x * TILE_SIZE, y: y * TILE_SIZE, r: 0, life: 1.0, color: color });
+    }
 }
 
 function spawnTrail(x, y, color) {
-    trails.push({ x, y, life: 1.0, color });
+    // Limit trail creation to prevent performance issues
+    if (trails.length < MAX_TRAILS) {
+        trails.push({ x, y, life: 1.0, color });
+    }
 }
 
 /**
@@ -838,12 +929,20 @@ function useO() {
  * GAME LOOP
  */
 
-function update() {
+function update(timestamp) {
     if (!gameActive) return;
+    
+    // Calculate delta time for frame-independent movement
+    if (!lastUpdateTime) lastUpdateTime = timestamp;
+    deltaTime = Math.min(timestamp - lastUpdateTime, 50); // Cap at 50ms to prevent huge jumps
+    lastUpdateTime = timestamp;
+    
     const now = Date.now();
     const elapsed = now - startTime;
     const isHard = gameMode === 'hard';
     const isRageable = (selectedBot !== 'anh');
+    // Calculate time scale based on target FPS
+    const timeScale = deltaTime / TARGET_FRAME_TIME;
     // BOT STATES
     const rageCycle = 15000 - (selectedBot === 'luom' ? 5000 : 0) - (isHard ? 2000 : 0);
     const rageDuration = 5000;
@@ -924,7 +1023,7 @@ function update() {
         } else if (selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#f97316';
-            statusEl.innerText = `🔥 HUNTER MODE! KILLS: ${player.countKills}`;
+            statusEl.innerText = `🔥 HUNTER MODE!`;
         } else if (selectedChar === 'thoai' && player.isThoaiSlow && now < player.thoaisuperSlowEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#a78bfa';
@@ -952,7 +1051,7 @@ function update() {
         } else if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#38bdf8';
-            statusEl.innerText = '🌬️ CON CỦA THẦN GIÓ! (2X TỐC ĐỘ + XUYÊN BOT)';
+            statusEl.innerText = '🌬️ CON CỦA THẦN GIÓ! (2.5X TỐC ĐỘ + XUYÊN BOT)';
         } else if (selectedChar === 'trung' && player.isTrungTired && now < player.trungTiredEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#94a3b8';
@@ -1010,7 +1109,7 @@ function update() {
         if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) mult *= 2.5;
         if (selectedChar === 'trung' && player.isTrungTired && now < player.trungTiredEnd) mult *= 0.5;
     }
-    let pSpd = baseSpd * mult;
+    let pSpd = baseSpd * mult * timeScale;
     if (pSpd > 0) {
         if (keys.w && !checkCollision(player.x, player.y - pSpd)) {player.y -= pSpd; player.isMoving = true;}
         if (keys.s && !checkCollision(player.x, player.y + pSpd)) {player.y += pSpd; player.isMoving = true;}
@@ -1103,7 +1202,7 @@ function update() {
             return;
         }
         const superEnraged = (now > b.superRageStart && now < b.superRageEnd) && isRageable;
-        let finalBSpd = bSpdBase;
+        let finalBSpd = bSpdBase * timeScale;
         if (superEnraged) finalBSpd *= (selectedBot === 'luom' ? 4.0 : 3.0);
         else if (isCommonRage) finalBSpd *= 2.0;
         if (b.isSlow) finalBSpd *= 0.35;
@@ -1135,7 +1234,7 @@ function update() {
             let target = (decoys.length > 0) ? decoys[0] : player;
             if (now > b.nextPathUpdate || b.currentPath.length === 0) {
                 b.currentPath = getPath(b.x, b.y, target.x, target.y);
-                b.nextPathUpdate = now + (isCommonRage ? 175 : 250);
+                b.nextPathUpdate = now + (isCommonRage ? 350 : 500);
             }
             if (b.currentPath && b.currentPath.length > 1) {
                 let next = b.currentPath[1];
@@ -1208,7 +1307,7 @@ function update() {
     bots = bots.filter(b => !b.isDead);
     if (lpbots > bots.length){
         player.countKills = lpbots - bots.length
-        const kmult = (selectedChar === 'quang' ? 0.025 : 0.25) * player.countKills;
+        const kmult = (selectedChar === 'quang' ? 0.03 : 0.25) * player.countKills;
         yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * kmult);
         uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * kmult);
         iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * kmult);
@@ -1352,10 +1451,10 @@ function update() {
     }
 
     // CLEANUP
-    shockwaves.forEach(s => { s.r += 10; s.life -= 0.025; });
-    shockwaves = shockwaves.filter(s => s.life > 0);
-    trails.forEach(t => t.life -= 0.06);
-    trails = trails.filter(t => t.life > 0);
+    shockwaves.forEach(s => { s.r += 10 * timeScale; s.life -= 0.025 * timeScale; });
+    shockwaves = shockwaves.filter(s => s.life > 0).slice(-MAX_SHOCKWAVES); // Limit shockwaves
+    trails.forEach(t => t.life -= 0.06 * timeScale);
+    trails = trails.filter(t => t.life > 0).slice(-MAX_TRAILS); // Limit trails
     traps = traps.filter(t => now < t.life);
     if (shakeAmount > 0) shakeAmount *= 0.92;
     if (now > freezeEnd) freezeEnd = 0;
@@ -1413,7 +1512,7 @@ function update() {
         const debug = document.getElementById('debug');
         debug.classList.remove('hidden');
         debug.innerText = `X: ${player.x.toFixed(3)} ; Y: ${player.y.toFixed(3)}`
-                        + `\nSpeed: ${pSpd}`
+                        + `\nSpeed: ${pSpd.toFixed(5)}`
                         + `\nIsMoving: ${player.isMoving}`;
     }
 }
@@ -1426,28 +1525,24 @@ function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false) {
     if (!isBot && player.isParrying && Date.now() < player.parryEnd) {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = '#ffffff';
+        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 20; ctx.shadowColor = '#ffffff'; }
         ctx.strokeRect(x * TILE_SIZE - size * 0.8, y * TILE_SIZE - size * 0.8, size * 1.6, size * 1.6);
         ctx.shadowBlur = 0;
     }
     if (!isBot && player.isShield && Date.now() < player.shieldEnd) {
         ctx.strokeStyle = '#fbbf24';
         ctx.lineWidth = 4;
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = '#fbbf24';
+        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 20; ctx.shadowColor = '#fbbf24'; }
         ctx.strokeRect(x * TILE_SIZE - size * 0.8, y * TILE_SIZE - size * 0.8, size * 1.6, size * 1.6);
         ctx.shadowBlur = 0;
     }
     if (isBot && isEnraged) {
         ctx.fillStyle = '#f97316';
-        ctx.shadowBlur = 25;
-        ctx.shadowColor = '#f97316';
+        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 25; ctx.shadowColor = '#f97316'; }
     }
     else {
         ctx.fillStyle = color;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = ctx.fillStyle;
+        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle; }
     }
 
     if (!isBot && player.isQuangJumping && Date.now() < player.quangJumpEnd){
@@ -1456,17 +1551,17 @@ function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false) {
         const jumpY = y * TILE_SIZE + TILE_SIZE * 0.3;
         
         // Shadow on the ground (ellipse)
-        ctx.save();
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.beginPath();
-        ctx.ellipse(x * TILE_SIZE, y * TILE_SIZE + TILE_SIZE * 0.25, jumpSize * 0.4, jumpSize * 0.15, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        
+        if (ENABLE_SHADOW_EFFECTS) { 
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.beginPath();
+            ctx.ellipse(x * TILE_SIZE, y * TILE_SIZE + TILE_SIZE * 0.25, jumpSize * 0.4, jumpSize * 0.15, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
         // Bigger entity in the air
         ctx.fillStyle = color;
-        ctx.shadowBlur = 25;
-        ctx.shadowColor = '#fbbf24';
+        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 25; ctx.shadowColor = '#fbbf24'; }
         ctx.fillRect(x * TILE_SIZE - jumpSize / 2, y * TILE_SIZE - jumpSize / 2 - TILE_SIZE * 0.3, jumpSize, jumpSize);
         ctx.shadowBlur = 0;
         
@@ -1488,36 +1583,40 @@ function draw(inRage) {
     if (shakeAmount > 1) ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-            if (maze[r][c] === '#') {
-                let grad = ctx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
-                grad.addColorStop(0, inRage ? '#450a0a' : '#222c3c');
-                grad.addColorStop(1, '#020617');
-                ctx.fillStyle = grad;
-                ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            } else if (maze[r][c] === 'a') {
-                let grad = ctx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
-                grad.addColorStop(0, '#ffae00');
-                grad.addColorStop(1, '#b6ae25');
-                ctx.fillStyle = grad;
-                ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            } else if (maze[r][c] === 'K') {
-                ctx.fillStyle = '#eab308';
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = '#eab308';
-                ctx.beginPath();
-                ctx.arc(c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
+    // Use cached maze rendering for performance
+    if (mazeCache) {
+        ctx.drawImage(inRage && mazeCacheRage ? mazeCacheRage : mazeCache, 0, 0);
+    } else {
+        // Fallback: draw maze directly if cache not available
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (maze[r][c] === '#') {
+                    let grad = ctx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
+                    grad.addColorStop(0, inRage ? '#450a0a' : '#222c3c');
+                    grad.addColorStop(1, '#020617');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                } else if (maze[r][c] === 'a') {
+                    let grad = ctx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
+                    grad.addColorStop(0, '#ffae00');
+                    grad.addColorStop(1, '#b6ae25');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                } else if (maze[r][c] === 'K') {
+                    ctx.fillStyle = '#eab308';
+                    if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 20; ctx.shadowColor = '#eab308'; }
+                    ctx.beginPath();
+                    ctx.arc(c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
             }
         }
     }
 
     traps.forEach(t => {
         ctx.fillStyle = (t.isGlowing ? '#ffffff' : '#505050');
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = (t.isGlowing ? '#ffffff' : '#505050')
+        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 10; ctx.shadowColor = (t.isGlowing ? '#ffffff' : '#505050'); }
         ctx.fillRect(t.x * TILE_SIZE - 6, t.y * TILE_SIZE - 6, 12, 12);
         ctx.shadowBlur = 0;
     });
@@ -1541,8 +1640,7 @@ function draw(inRage) {
         ctx.beginPath();
         ctx.arc(cx, cy, TILE_SIZE * 0.5 * pulse, 0, Math.PI * 2);
         ctx.fillStyle = '#000';
-        ctx.shadowBlur = 60;
-        ctx.shadowColor = glowColor;
+        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 60; ctx.shadowColor = glowColor; }
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.save();
@@ -1669,8 +1767,7 @@ function draw(inRage) {
         ctx.beginPath();
         ctx.arc(rx, ry, TILE_SIZE * 0.4 * pulse, 0, Math.PI * 2);
         ctx.fillStyle = rGrad;
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = '#38bdf8';
+        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 20; ctx.shadowColor = '#38bdf8'; }
         ctx.fill();
         ctx.shadowBlur = 0;
     }
