@@ -280,7 +280,7 @@ function createMazeCacheRage() {
     const cacheCtx = mazeCacheRage.getContext('2d');
     
     for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
+        for (let c = 0; c < COLS; c++) { 
             if (maze[r][c] === '#') {
                 let grad = cacheCtx.createLinearGradient(c * TILE_SIZE, r * TILE_SIZE, (c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
                 grad.addColorStop(0, '#450a0a');
@@ -1938,7 +1938,7 @@ window.selectChar = (c) => {
 };
 
 window.changeCharTab = (dir) => {
-    const charOrder = ['khang', 'dang', 'loi', 'tan', 'thoai', 'quang', 'trung'];
+    const charOrder = ['khang', 'dang', 'loi', 'thoai', 'quang', 'tan', 'trung'];
     const currentIndex = charOrder.indexOf(selectedChar);
     let newIndex = currentIndex + dir;
     if (newIndex < 0) newIndex = charOrder.length - 1;
