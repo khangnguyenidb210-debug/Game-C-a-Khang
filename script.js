@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 7)";
+const version = "1.2 (preview, build 8)";
 const debugmode = true;
 
 // GAME CONFIG - Tùy chỉnh tốc độ game (sẽ được load từ settings)
@@ -29,7 +29,7 @@ let player = {
     isTanGod: false, tanGodEnd: 0,
     isTanSharingan: false, tanSharinganEnd: 0,
     isTanHunter: false, tanHunterEnd: 0,
-    countKills: 0,
+    countKills: 0, totalKills: 0,
     // Thoai skills
     isThoaiSlow: false, thoaisuperSlowEnd: 0,       // [Y] bots slowed
     isThoaiBoosted: false, thoaiBoostedEnd: 0,  // [U] Thoai speed boost after rage bait
@@ -164,8 +164,21 @@ function togglePause() {
 }
 
 /**
- * SOUND ENGINE
+ * SOUND ENGINE (LEGACY)
  */
+
+function playSound(url, vol = 1.0) {
+    const audio = new Audio(url);
+    audio.volume = vol;
+    audio.play().catch(error => console.log("Playback blocked:", error));
+}
+
+function stopSound(url) {
+    const audio = new Audio(url);
+    audio.currentTime = 0;
+    audio.pause().catch(error => console.log("Stop blocked:", error));
+}
+
 let audioCtx = null;
 function playSfx(f, t, d, v = 0.1, s = 0) {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -184,17 +197,367 @@ function playSfx(f, t, d, v = 0.1, s = 0) {
     } catch (e) { }
 }
 
-function playSound(url, vol = 1.0) {
-    const audio = new Audio(url);
-    audio.volume = vol;
-    audio.play().catch(error => console.log("Playback blocked:", error));
+/**
+ * SOUND ENGINE
+ */
+class AudioManager {
+    constructor() {
+        this.channels = {
+            music: {},
+            sfx: {},
+            ui: {},
+            ambient: {}
+        };
+
+        this.masterVolume = 1;
+        this.channelVolume = {
+            music: 1,
+            sfx: 1,
+            ui: 1,
+            ambient: 1
+        };
+
+        this.loaded = 0;
+        this.total = 0;
+    }
+
+    // PRELOAD
+    preload(list, callback = null) {
+        this.total = list.length;
+        this.loaded = 0;
+
+        for (const item of list) {
+            this.load(
+                item.channel,
+                item.name,
+                item.src,
+                item.config,
+                () => {
+                    this.loaded++;
+
+                    if (callback)
+                        callback(this.loaded, this.total);
+
+                    if (this.loaded === this.total) {
+                        console.log("Toàn bộ âm thanh đã tải xong");
+                    }
+                }
+            );
+        }
+    }
+
+    // LOAD
+    load(channel, name, src, config = {}, onLoaded = null) {
+        const audio = new Audio();
+
+        audio.preload = "auto";
+        audio.src = src;
+        audio.volume = config.volume ?? 1;
+        audio.loop = config.loop ?? false;
+        audio.playbackRate = config.speed ?? 1;
+
+        audio.addEventListener("canplaythrough", () => {
+            if (onLoaded) onLoaded();
+        }, { once: true });
+
+        this.channels[channel][name] = {
+            audio: audio,
+            baseVolume: config.volume ?? 1,
+            pitch: config.pitch ?? 1
+        };
+
+        this.updateVolume(channel, name);
+
+        audio.load();
+    }
+
+    // PLAY
+    play(channel, name) {
+        const sound = this.channels[channel][name];
+        if (!sound) return;
+
+        sound.audio.currentTime = 0;
+        sound.audio.play();
+    }
+
+    // STOP
+    stop(channel, name) {
+        const sound = this.channels[channel][name];
+        if (!sound) return;
+
+        sound.audio.pause();
+        sound.audio.currentTime = 0;
+    }
+
+    stopChannel(channel) {
+        if (!this.channels[channel]) return;
+
+        for (let name in this.channels[channel]) {
+            const sound = this.channels[channel][name];
+
+            sound.audio.pause();
+            sound.audio.currentTime = 0;
+        }
+    }
+
+    // VOLUME
+    updateVolume(channel, name) {
+        const sound = this.channels[channel][name];
+        if (!sound) return;
+
+        sound.audio.volume =
+            sound.baseVolume *
+            this.channelVolume[channel] *
+            this.masterVolume;
+    }
+
+    setMasterVolume(vol) {
+        this.masterVolume = vol;
+
+        for (let channel in this.channels)
+            for (let name in this.channels[channel])
+                this.updateVolume(channel, name);
+    }
+
+    setChannelVolume(channel, vol) {
+        this.channelVolume[channel] = vol;
+        for (let name in this.channels[channel])
+            this.updateVolume(channel, name);
+    }
 }
 
-function stopSound(url) {
-    const audio = new Audio(url);
-    audio.currentTime = 0;
-    audio.pause().catch(error => console.log("Stop blocked:", error));
-}
+const audio = new AudioManager();
+audio.preload([
+    // Quyen's audio
+    {
+        channel: "sfx",
+        name: "quyen-delaying",
+        src: "assets/quyen/delaying.mp3",
+        config: { volume: 0.9 }
+    },
+    // Anh's audio
+    {
+        channel: "sfx", 
+        name: "anh-placingwall",
+        src: "assets/anh/placingwall.mp3"
+    },
+    // Luom's audio
+    {
+        channel: "sfx",
+        name: "luom-rage",
+        src: "assets/luom/rage.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "luom-move",
+        src: "assets/luom/move.mp3",
+        config: { volume: 0.35 }
+    },
+    // Khang's audio
+    {
+        channel: "sfx",
+        name: "khang-dash1",
+        src: "assets/khang/dash1.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "khang-dash2",
+        src: "assets/khang/dash2.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "khang-letsgo",
+        src: "assets/khang/lets-go.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "khang-timestop",
+        src: "assets/khang/time-stop.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "khang-trapcaught",
+        src: "assets/khang/trap-caught.mp3",
+        config: { volume: 0.6 }
+    },
+    // Dang's audio
+    {
+        channel: "sfx",
+        name: "dang-findpath",
+        src: "assets/dang/find-path.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "dang-missing",
+        src: "assets/dang/missing.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "dang-parrying",
+        src: "assets/dang/parrying.mp3",
+        config: { volume: 0.8 }
+    },
+    {
+        channel: "sfx",
+        name: "dang-parrysucess",
+        src: "assets/dang/parry-sucess.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "dang-punchsucess",
+        src: "assets/dang/punch-sucess.mp3",
+        config: { volume: 0.6 }
+    },
+    {
+        channel: "sfx",
+        name: "dang-weave",
+        src: "assets/dang/weave.mp3"
+    },
+    // Loi's audio
+    {
+        channel: "sfx",
+        name: "loi-stagger",
+        src: "assets/loi/stagger.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "loi-teleport",
+        src: "assets/loi/teleport.mp3",
+        config: { volume: 0.7 }
+    },
+    // Thoai's audio
+    {
+        channel: "sfx",
+        name: "thoai-blackhole",
+        src: "assets/thoai/black-hole.mp3",
+        config: { volume: 0.7 }
+    },
+    {
+        channel: "sfx",
+        name: "thoai-mitombokhoradio",
+        src: "assets/thoai/mi-tom-bo-kho-radio.mp3",
+        config: { volume: 0.67 }
+    },
+    {
+        channel: "sfx",
+        name: "thoai-motcaichettruyenthong",
+        src: "assets/thoai/mot-cai-chet-truyen-thong.mp3",
+        config: { volume: 0.67 }
+    },
+    {
+        channel: "sfx",
+        name: "thoai-ragebait",
+        src: "assets/thoai/ragebait.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "thoai-ragebaitsucess",
+        src: "assets/thoai/ragebait-sucess.mp3",
+        config: { volume: 0.6 }
+    },
+    // Quang's audio
+    {
+        channel: "sfx",
+        name: "quang-burps",
+        src: "assets/quang/burps.mp3",
+        config: { volume: 0.8 }
+    },
+    {
+        channel: "sfx",
+        name: "quang-landing",
+        src: "assets/quang/landing.mp3",
+        config: { volume: 0.9 }
+    },
+    {
+        channel: "sfx",
+        name: "quang-nom",
+        src: "assets/quang/nom.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "quang-stomp",
+        src: "assets/quang/stomp.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "quang-wee",
+        src: "assets/quang/wee.mp3",
+        config: { volume: 0.5 }
+    },
+    // Tan's audio
+    {
+        channel: "sfx",
+        name: "tan-delete",
+        src: "assets/tan/delete.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "tan-hunter",
+        src: "assets/tan/hunter.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "tan-sasuke",
+        src: "assets/tan/sasuke.mp3",
+        config: { volume: 0.85 }
+    },
+    {
+        channel: "sfx",
+        name: "tan-sharingan",
+        src: "assets/tan/sharingan.mp3"
+    },
+    // Trung's audio
+    {
+        channel: "sfx",
+        name: "trung-thechildofthewindgod",
+        src: "assets/trung/the-child-of-the-wind-god.mp3",
+        config: { volume: 0.45 }
+    },
+    {
+        channel: "sfx",
+        name: "trung-rasengan",
+        src: "assets/trung/rasengan.mp3",
+        config: { volume: 0.67 }
+    },
+    {
+        channel: "sfx",
+        name: "trung-katanaschwing",
+        src: "assets/trung/katana-schwing.mp3",
+        config: { volume: 0.5 }
+    },
+    {
+        channel: "sfx",
+        name: "trung-hasagi",
+        src: "assets/trung/hasagi.mp3",
+        config: { volume: 0.7 }
+    },
+    // Others audio
+    {
+        channel: "sfx",
+        name: "kill",
+        src: "assets/sfx/kill.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "newlevel",
+        src: "assets/sfx/new-level.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "rage1",
+        src: "assets/sfx/rahhh.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "rage2",
+        src: "assets/sfx/waapp-angry.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "win",
+        src: "assets/sfx/win.mp3"
+    },
+]);
 
 // Cảnh báo phẫn nộ
 function playAlarm() {
@@ -324,6 +687,15 @@ function checkCollision(x, y, ignoreWalls = false) {
     return false;
 }
 
+// Kiểm tra va chạm theo từng hướng cụ thể
+function checkCollisionDir(x, y, dirX, dirY, ignoreWalls = false) {
+    // Thử di chuyển theo hướng chính
+    if (checkCollision(x + dirX * 0.01, y + dirY * 0.01, ignoreWalls)) {
+        return true;
+    }
+    return false;
+}
+
 function resolveWallStick() {
     if (checkCollision(player.x, player.y)) {
         const dirs = [[0.1, 0], [-0.1, 0], [0, 0.1], [0, -0.1]];
@@ -337,6 +709,104 @@ function resolveWallStick() {
             }
         }
     }
+}
+
+// Di chuyển player với cơ chế sát tường và trượt
+function movePlayerWithSlide(moveX, moveY, speed) {
+    if (moveX === 0 && moveY === 0) return false;
+    
+    let moved = false;
+    const originalX = player.x;
+    const originalY = player.y;
+    
+    // Thử di chuyển theo cả hai hướng (đường chéo)
+    if (moveX !== 0 && moveY !== 0) {
+        const diagSpeed = speed * 0.707; // Tốc độ đường chéo
+        
+        // Thử đường chéo trực tiếp
+        if (!checkCollision(player.x + moveX * diagSpeed, player.y + moveY * diagSpeed)) {
+            player.x += moveX * diagSpeed;
+            player.y += moveY * diagSpeed;
+            moved = true;
+        } else {
+            // Thử từng hướng riêng (trượt dọc theo tường)
+            // Thử X trước
+            if (!checkCollision(player.x + moveX * speed, player.y)) {
+                player.x += moveX * speed;
+                moved = true;
+            }
+            // Thử Y sau
+            if (!checkCollision(player.x, player.y + moveY * speed)) {
+                player.y += moveY * speed;
+                moved = true;
+            }
+        }
+    } else {
+        // Di chuyển thẳng (WASD)
+        if (moveX !== 0) {
+            if (!checkCollision(player.x + moveX * speed, player.y)) {
+                player.x += moveX * speed;
+                moved = true;
+            } else {
+                // Thử trượt dọc theo trục Y (sát tường)
+                for (let offset = 0.1; offset < 0.5; offset += 0.05) {
+                    if (!checkCollision(player.x + moveX * speed, player.y + offset)) {
+                        player.x += moveX * speed;
+                        player.y += offset;
+                        moved = true;
+                        break;
+                    }
+                    if (!checkCollision(player.x + moveX * speed, player.y - offset)) {
+                        player.x += moveX * speed;
+                        player.y -= offset;
+                        moved = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (moveY !== 0) {
+            if (!checkCollision(player.x, player.y + moveY * speed)) {
+                player.y += moveY * speed;
+                moved = true;
+            } else {
+                // Thử trượt dọc theo trục X (sát tường)
+                for (let offset = 0.1; offset < 0.5; offset += 0.05) {
+                    if (!checkCollision(player.x + offset, player.y + moveY * speed)) {
+                        player.x += offset;
+                        player.y += moveY * speed;
+                        moved = true;
+                        break;
+                    }
+                    if (!checkCollision(player.x - offset, player.y + moveY * speed)) {
+                        player.x -= offset;
+                        player.y += moveY * speed;
+                        moved = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Kiểm tra và xử lý nếu vẫn còn trong tường
+    if (checkCollision(player.x, player.y)) {
+        // Thử di chuyển từng chút một để thoát ra
+        const dirs = [
+            [0.01, 0], [-0.01, 0], [0, 0.01], [0, -0.01],
+            [0.01, 0.01], [-0.01, 0.01], [0.01, -0.01], [-0.01, -0.01]
+        ];
+        for (let [dx, dy] of dirs) {
+            if (!checkCollision(player.x + dx, player.y + dy)) {
+                player.x += dx;
+                player.y += dy;
+                moved = true;
+                break;
+            }
+        }
+    }
+    
+    return moved;
 }
 
 /**
@@ -410,14 +880,14 @@ function useY() {
             if (player.khangDashCount < 2) yCD = now + 400;
             else { player.khangDashCount = 0; yCD = now + 1500 * (selectedBot === 'anh' ? 1.5 : 1); }
         } else yCD = now + COOLDOWNS.khang.y * (selectedBot === 'anh' ? 1.5 : 1);
-        playSound(`assets/dash${Math.random() < 0.5 ? 1 : 2}.mp3`);
+        audio.play("sfx", `khang-dash${Math.random() < 0.5 ? 1 : 2}`);
     } else if (selectedChar === 'dang') {
         player.isCoffee = true;
         player.coffeeEnd = now + 4000;
         yCD = now + COOLDOWNS.dang.y * (selectedBot === 'anh' ? 1.5 : 1);
         showRoad = true;
         player.roadEnd = now + 4000;
-        playSfx(800, 'triangle', 0.4);
+        audio.play("sfx", "dang-findpath");
     } else if (selectedChar === 'loi') {
                 let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
         if (!dx && !dy) dy = -1;
@@ -429,7 +899,7 @@ function useY() {
         }
         spawnShockwave(player.x, player.y, '#6366f1');
         yCD = now + COOLDOWNS.loi.y * (selectedBot === 'anh' ? 1.5 : 1);
-        playSound('assets/teleport.mp3', 0.7);
+        audio.play("sfx", "loi-teleport");
     } else if (selectedChar === 'tan') {
         // GOD MODE: 2x speed + immortal for 5s
         player.isTanGod = true;
@@ -437,7 +907,7 @@ function useY() {
         player.isInvincible = true;
         player.invincibleEnd = now + 5000;
         shakeAmount = 20;
-        playSound('assets/sasuke.mp3', 0.9);
+        audio.play("sfx", "tan-sasuke");
         for (let i = 0; i < 10; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, i % 2 ? '#facc15' : '#fff');
@@ -465,7 +935,7 @@ function useY() {
             mitombokho.classList.add('hidden');
             mitombokho.style.transition = 'none';
         }, 600);
-        playSound('assets/mitombokhoradio.mp3', 0.67);
+        audio.play("sfx", "thoai-mitombokhoradio");
         yCD = now + COOLDOWNS.thoai.y * (selectedBot === 'anh' ? 1.5 : 1);
     } else if (selectedChar === 'quang') {
         // EARTHQUAKE: shake camera, delay bots 3s, then 0.25x speed for 2s
@@ -476,7 +946,7 @@ function useY() {
                 spawnShockwave(player.x, player.y, i % 2 ? '#a16207' : '#78350f');
             }, i * 150);
         }
-        playSound('assets/stomp.mp3', 0.7);
+        audio.play("sfx", "quang-stomp");
         bots.forEach(b => {
             b.delayUntil = now + 4500;
             b.quangEarthquakeSlowUntil = now + 4500;
@@ -492,7 +962,7 @@ function useY() {
         for (let i = 0; i < 12; i++) {
             setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#38bdf8' : '#e0f2fe'), i * 80);
         }
-        playSound('assets/the-child-of-the-wind-god.mp3', 0.45);
+        audio.play("sfx", "trung-thechildofthewindgod");
         setTimeout(() => {
             player.isTrungWindGod = false;
             player.isGhost = false;
@@ -512,9 +982,8 @@ function useU() {
     if (selectedChar === 'khang') {
         freezeEnd = now + 4000;
         spawnShockwave(player.x, player.y, 'rgba(255,255,255,0.5)');
-        playSound('assets/timestop.mp3', 1.0);
+        audio.play("sfx", "khang-timestop");
         document.body.classList.add('time-stop');
-        // play the time-stop effect in reverse
         setTimeout(() => {
             document.body.classList.remove('time-stop');
             spawnShockwave(player.x, player.y, 'rgba(255,255,255,0.5)');
@@ -543,6 +1012,7 @@ function useU() {
                             break;
                         }
                     }
+                    if (!checkCollision(b.x, b.y)) break;
                 }
             }
         });
@@ -558,8 +1028,8 @@ function useU() {
         }
         if (isPunchSuccess) {
             spawnShockwave(player.x, player.y, 'rgba(255, 255, 255, 0.8)');
-            playSound('assets/punchsucess.mp3', 0.5);
-        } else playSound('assets/missing.mp3', 0.8)
+            audio.play("sfx", "dang-punchsucess");
+        } else audio.play("sfx", "dang-missing");
 
     } else if (selectedChar === 'loi') {
         freezeEnd = now + 3000;
@@ -583,13 +1053,12 @@ function useU() {
             b.superRageStart = now + 10000;
             b.superRageEnd = now + 13000;
         });
-        playSound('assets/sharingan.mp3', 1.0);
-        // Flash sharingan image
+        audio.play("sfx", "tan-sharingan");
         const sharinganImg = document.getElementById('sharingan-flash');
         sharinganImg.classList.remove('hidden');
         sharinganImg.style.opacity = 1;
         setTimeout(() => {
-            sharinganImg.style.transition = 'opacity 1.2s ease-out';
+            sharinganImg.style.transition = 'opacity 1s ease-out';
             sharinganImg.style.opacity = 0;
         }, 300);
         setTimeout(() => {
@@ -610,13 +1079,13 @@ function useU() {
         });
         shakeAmount = 20;
         spawnShockwave(player.x, player.y, '#f43f5e');
-        playSound('assets/yeah_come_get_some_ya_freakin_wuss.mp3', 1.0)
+        audio.play("sfx", "thoai-ragebait");
         // After 2s, Thoai gets 2x speed for 3s
         setTimeout(() => {
             player.isThoaiBoosted = true;
             player.thoaiBoostedEnd = now + 5000;
             spawnShockwave(player.x, player.y, '#22c55e');
-            playSound('assets/afterragebait.mp3', 0.65);
+            audio.play("sfx", "thoai-ragebaitsucess");
         }, 2000);
     } else if (selectedChar === 'quang') {
         // GRAVITY FIELD: player slowed 0.5x for 2s, bots frozen 5s (gravitational pull effect)
@@ -639,7 +1108,7 @@ function useU() {
     } else if (selectedChar === 'trung') {
         // HASAGI: wild shockwave push everyone through the maze
         shakeAmount = 35;
-        playSound('assets/hasagi.mp3', 0.7);
+        audio.play("sfx", "trung-hasagi");
         for (let i = 0; i < 15; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, i % 2 ? '#60a5fa' : '#bfdbfe');
@@ -704,7 +1173,7 @@ function useI() {
         player.invincibleEnd = now + 1250;
         player.isParrying = true;
         player.isInvincible = true;
-        playSound('assets/epic-twinkle.mp3', 0.8);
+        audio.play("sfx", "dang-parrying");
         spawnShockwave(player.x, player.y, '#cecece');
     } else if (selectedChar === 'loi') {
         decoys.push({ x: player.x, y: player.y, lifeEnd: now + 8000 });
@@ -717,7 +1186,7 @@ function useI() {
                 spawnShockwave(b.x, b.y, '#f97316');
                 spawnShockwave(b.x, b.y, '#facc15');
             });
-            playSound('assets/delete.mp3', 0.8);
+            audio.play("sfx", "tan-delete");
             for (let i = 1; i < 6; i++) {
                 setTimeout(() => playSfx(150 + i * 80, 'sawtooth', 0.3, 0.3), i * 60);
             }
@@ -752,9 +1221,35 @@ function useI() {
             nganthot.classList.add('hidden');
             nganthot.style.transition = 'none';
         }, 600);
-        playSound('assets/motcaichettruyenthong.mp3', 0.67);
+        audio.play("sfx", "thoai-motcaichettruyenthong");
     } else if (selectedChar === 'quang') {
-        playSound('assets/burps.mp3', 0.7);
+        audio.play("sfx", "quang-burps");
+        bots.forEach(b => {
+            const dx = b.x - player.x, dy = b.y - player.y;
+            const d = Math.sqrt(dx * dx + dy * dy) || 1;
+            if (d < 6.7) {
+                b.x = Math.max(1, Math.min(COLS - 2, b.x + (dx / d) * 5));
+                b.y = Math.max(1, Math.min(ROWS - 2, b.y + (dy / d) * 5));
+                b.isSlow = true;
+                b.slowEnd = now + 3500;
+                b.delayUntil = now + 1000;
+            }
+        });
+        bots.forEach(b => {
+            if (checkCollision(b.x, b.y)) {
+                let dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
+                for (let dist = 0.1; dist < 5; dist += 0.1) {
+                    for (let [dx, dy] of dirs) {
+                        if (!checkCollision(b.x + dx * dist, b.y + dy * dist)) {
+                            b.x += dx * dist;
+                            b.y += dy * dist;
+                            break;
+                        }
+                    }
+                    if (!checkCollision(b.x, b.y)) break;
+                }
+            }
+        });
         player.isSlow = true;
         player.slowEnd = now + 1000;
         for (let i = 0; i < 10; i++) {
@@ -763,35 +1258,11 @@ function useI() {
                 shakeAmount = 50;
             }, i * 60);
         }
-        bots.forEach(b => {
-            const dx = b.x - player.x, dy = b.y - player.y;
-            const d = Math.sqrt(dx * dx + dy * dy) || 1;
-            const pushDist = 5;
-            b.x = Math.max(1, Math.min(COLS - 2, b.x + (dx / d) * pushDist));
-            b.y = Math.max(1, Math.min(ROWS - 2, b.y + (dy / d) * pushDist));
-            b.isSlow = true;
-            b.slowEnd = now + 3500;
-            b.delayUntil = now + 1000;
-        });
-        bots.forEach(b => {
-            if (checkCollision(b.x, b.y)) {
-                const dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
-                for (let dist = 0.1; dist < 5; dist += 0.1) {
-                    for (let [ddx, ddy] of dirs) {
-                        if (!checkCollision(b.x + ddx * dist, b.y + ddy * dist)) {
-                            b.x += ddx * dist; b.y += ddy * dist; 
-                            break;
-                        }
-                    }
-                    if (!checkCollision(b.x, b.y)) break;
-                }
-            }
-        });
     } else if (selectedChar === 'trung') {
         // ATOMIC SLICE: dash like Khang Y, kill all bots surfed past (split effect)
         let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
         if (!dx && !dy) dy = -1;
-        playSound('assets/katana-schwing.mp3', 0.45);
+        audio.play("sfx", "trung-katanaschwing");
         const dashPositions = [];
         for (let i = 0; i < 16; i++) {
             let nx = player.x + dx * 0.4, ny = player.y + dy * 0.4;
@@ -813,7 +1284,7 @@ function useI() {
                         spawnShockwave(b.x - s * dx * 0.3, b.y - s * dy * 0.3, '#7dd3fc');
                     }, s * 40);
                 }
-                playSound('assets/kill.mp3', 0.8);
+                audio.play("sfx", "kill");
                 b.isDead = true;
             }
         });
@@ -831,7 +1302,7 @@ function useO() {
         player.isGhost = true;
         player.ultEnd = now + 4500;
         player.ghostEnd = now + 4500;
-        playSound('assets/weave.mp3');
+        audio.play("sfx", "dang-weave");
         for (let i = 0; i < 6; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, i % 2 ? '#06b6d4' : '#fff');
@@ -840,7 +1311,7 @@ function useO() {
     } else if (selectedChar === 'khang') {
         player.isUlt = true;
         player.ultEnd = now + 5000;
-        playSound('assets/lets-go.mp3', 1);
+        audio.play("sfx", "khang-letsgo");
         iCD = now;
         player.khangTraps = 5;
         document.getElementById('trap-counter').classList.remove('hidden');
@@ -871,7 +1342,7 @@ function useO() {
             }
         });
         spawnShockwave(player.x, player.y, '#6366f1');
-        playSound('assets/stagger.mp3', 1);
+        audio.play("sfx", "loi-stagger");
     } else if (selectedChar === 'tan') {
         // HUNTER ULT: become hunter — touching bots destroys them, +0.25x speed per kill, lasts 30s
         player.isTanHunter = true;
@@ -880,7 +1351,7 @@ function useO() {
         player.isInvincible = true;
         player.invincibleEnd = now + 30000;
         shakeAmount = 50;
-        playSound('assets/stagger.mp3', 1);
+        audio.play("sfx", "tan-hunter");
         for (let i = 0; i < 15; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, i % 3 === 0 ? '#facc15' : (i % 3 === 1 ? '#ef4444' : '#fff'));
@@ -899,14 +1370,14 @@ function useO() {
         for (let i = 0; i < 18; i++) {
             setTimeout(() => spawnShockwave(player.x, player.y, i % 3 === 0 ? '#000' : (i % 3 === 1 ? '#4c1d95' : '#7c3aed')), i * 60);
         }
-        playSound('assets/black-hole.mp3', 0.67);
+        audio.play("sfx", "thoai-blackhole");
     } else if (selectedChar === 'quang') {
         // EARTHQUAKE JUMP: jump and destroy 3x3 blocks when landing
         player.isQuangJumping = true;
         player.quangJumpEnd = now + 1500;
         player.isInvincible = true;
         player.invincibleEnd = now + 1700;
-        playSound('assets/wee.mp3', 0.4);
+        audio.play("sfx", "quang-wee");
         setTimeout(() => {
             player.isSlow = true;
             player.slowEnd = now + 1200;
@@ -919,7 +1390,7 @@ function useO() {
         player.trungRasenganX = player.x;
         player.trungRasenganY = player.y;
         shakeAmount = 20;
-        playSound('assets/rasengan-sound-effect.mp3', 0.67);
+        audio.play("sfx", "trung-rasengan");
         for (let i = 0; i < 10; i++) {
             setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#38bdf8' : '#7dd3fc'), i * 80);
         }
@@ -955,7 +1426,7 @@ function update(timestamp) {
         player.isDelayed = true;
         player.delayEnd = now + 3000;
         document.getElementById('warning-flash').classList.add('delay-warning');
-        playSound('assets/delaying.mp3', 0.9);
+        audio.play("sfx", "quyen-delaying");
     }
 
     if (now > player.delayEnd) {
@@ -978,7 +1449,7 @@ function update(timestamp) {
                         maze[wy][wx] = '.';
                     }, (isHard ? 7500 : 6000) + (500 * (currentLevel - 1)));
                     spawnShockwave(wx + 0.5, wy + 0.5, '#ef4444');
-                    playSound('assets/placingwall.mp3');
+                    audio.play("sfx", "anh-placingwall");
                     break;
                 }
             }
@@ -991,7 +1462,7 @@ function update(timestamp) {
         const luomDur = (isHard ? 85 : 65) + (isCommonRage ? (isHard ? 10 : 8) * currentLevel : 0);
         if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0) {
             isLuomCanMove = true;
-            playSound('assets/ruler-slap.mp3', 0.075);
+            audio.play("sfx", "luom-move");
         }
     }
 
@@ -1001,10 +1472,7 @@ function update(timestamp) {
         statusEl.innerText = "BOT RAGE! (2X SPEED)";
         statusEl.style.color = '';
         if (!isRaging) {
-            if (selectedBot !== 'quyen') 
-                playSound('assets/rahhh.mp3');
-            else
-                playSound('assets/waapp-angry.mp3');
+            audio.play("sfx", `rage${selectedBot !== 'quyen' ? 1 : 2}`);
             isRaging = true;
         }
         playAlarm();
@@ -1171,7 +1639,7 @@ function update(timestamp) {
                 for (let i = 0; i < 10; i++) {
                     setTimeout(() => spawnShockwave(player.trungRasenganX, player.trungRasenganY, i % 2 ? '#38bdf8' : '#ffffff'), i * 50);
                 }
-                playSound('assets/rasengan-sound-effect.mp3', 0.6);
+                audio.play("sfx", "trung-rasengan");
                 player.isTrungRasengan = false;
             }
         });
@@ -1226,6 +1694,7 @@ function update(timestamp) {
                 b.delayUntil = now + (isHard ? 3000 : 3500);
                 spawnShockwave(t.x, t.y, '#fff');
                 traps.splice(idx, 1);
+                audio.play("sfx", "khang-trapcaught");
                 b.superEnraged = true;
                 b.superRageStart = now + (isHard ? 3000 : 3500);
                 b.superRageEnd = now + (isHard ? 3000 : 3500) + 5000;
@@ -1253,7 +1722,7 @@ function update(timestamp) {
                 spawnShockwave(b.x, b.y, '#facc15');
                 spawnShockwave(b.x, b.y, '#ef4444');
                 shakeAmount = 15;
-                playSound('assets/kill.mp3');
+                audio.play("sfx", "kill");
                 b.isDead = true;
             } else if (player.isShield && now < player.shieldEnd) {
                 player.isShield = false;
@@ -1261,7 +1730,7 @@ function update(timestamp) {
                 spawnShockwave(player.x, player.y, '#fbbf24');
             } else if (player.isQuangGravity && now < player.quangGravityEnd) {
                 b.isDead = true;
-                playSound('assets/nom.mp3');
+                audio.play("sfx", "quang-nom");
             } else if (player.isParrying && now < player.parryEnd) {
                 freezeEnd = now + 2500;
                 player.isInvincible = true;
@@ -1280,11 +1749,11 @@ function update(timestamp) {
                     b.superRageStart = now + 3500;
                     b.superRageEnd = now + 7000;
                     if (selectedBot === 'tin') 
-                        playSound('assets/rahhh.mp3');
+                        audio.play("sfx", "rage1");
                     else if (selectedBot === 'luom')
-                        playSound('assets/gotta-sweep.mp3');
+                        audio.play("sfx", "luom-rage");
                     else
-                        playSound('assets/waapp-angry.mp3');
+                        audio.play("sfx", "rage2");
                 }
                 // show parry picture + ease-out + sfx in assets
                 const parry = document.getElementById('parry-flash');
@@ -1298,10 +1767,11 @@ function update(timestamp) {
                     parry.classList.add('hidden');
                     parry.style.transition = 'none';
                 }, 600);
-                playSound('assets/parry.mp3');
+                audio.play("sfx", "dang-parrysucess");
             } else if (freezeEnd < now && !player.isInvincible && !player.isTanGod && !player.isGhost && !player.isQuangJumping) {
+                audio.stopChannel("sfx");
+                audio.play("sfx", "kill");
                 endGame(false, selectedBot);
-                playSound('assets/kill.mp3');
             }
         }
     });
@@ -1314,6 +1784,7 @@ function update(timestamp) {
         uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * kmult);
         iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * kmult);
         oCD = Math.max(now, oCD - COOLDOWNS[selectedChar].o * kmult);
+        player.totalKills += player.countKills;
         player.countKills = 0;
     }
     // BLACK HOLE update (Thoai [O] and Quang [I])
@@ -1344,7 +1815,7 @@ function update(timestamp) {
                 b.isDead = true;
                 spawnShockwave(bh.x, bh.y, '#7c3aed');
                 spawnShockwave(bh.x, bh.y, '#000');
-                playSound('assets/kill.mp3', 0.8);
+                audio.play("sfx", "kill");
             } else if (d < bh.radius) {
                 const pullStr = 0.04 * (1 - d / bh.radius);
                 b.x += (dx / d) * pullStr * 5;
@@ -1373,8 +1844,8 @@ function update(timestamp) {
                 shakeAmount = 50 - i * 10;
             }, i * 50);
         }
-        shakeAmount = 250;
-        playSound('assets/landing.mp3', 0.85);
+        shakeAmount = 200;
+        audio.play("sfx", "quang-landing");
         if (checkCollision(player.x, player.y)) {
             let dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
             for (let dist = 0.1; dist < 8; dist += 0.1) {
@@ -1389,16 +1860,17 @@ function update(timestamp) {
         }
         bots.forEach(b => {
             const bx = Math.floor(b.x), by = Math.floor(b.y);
-            if (Math.abs(bx - px) <= 1 && Math.abs(by - py) <= 1) {
+            if (Math.abs(bx - px) <= 1.25 && Math.abs(by - py) <= 1.25) {
                 b.isDead = true;
                 spawnShockwave(b.x, b.y, '#d97706');
                 spawnShockwave(b.x, b.y, '#fbbf24');
-                shakeAmount = 15;
-                playSound('assets/kill.mp3', 0.8);
+                shakeAmount = 20;
+                audio.play("sfx", "kill");
             }
         });
         // Force redraw ngay lập tức
         createMazeCache();
+        createMazeCacheRage();
         draw(isCommonRage & isRageable); // Vẽ với cache mới
     }
 
@@ -1446,11 +1918,12 @@ function update(timestamp) {
                 player.ultEnd = now + 5000;
                 document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: 5`;
             }
-            playSound('assets/newlevel.mp3');
+            audio.play("sfx", "new-level");
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
+            audio.stopChannel("sfx");
+            audio.play("sfx", "win");
             endGame(true, selectedBot);
-            playSound('assets/winning.mp3');
         }
     }
 
@@ -1463,7 +1936,8 @@ function update(timestamp) {
     if (shakeAmount > 0) shakeAmount *= 0.92;
     if (now > freezeEnd) freezeEnd = 0;
     if (now > player.parryEnd) {
-        if (player.isParrying && !player.isParrySuccess) playSound('assets/missing.mp3', 0.8)
+        if (player.isParrying && !player.isParrySuccess)
+            audio.play("sfx", "dang-missing");
         player.isParrying = false;
     }
     if (now > player.fastEnd) player.isFast = false;
@@ -1516,6 +1990,7 @@ function update(timestamp) {
         const debug = document.getElementById('debug');
         debug.classList.remove('hidden');
         debug.innerText = `X: ${player.x.toFixed(3)} ; Y: ${player.y.toFixed(3)}`
+                        + `\nKills: ${player.totalKills}`
                         + `\nSpeed: ${pSpd.toFixed(5)}`
                         + `\nIsMoving: ${player.isMoving}`;
     }
@@ -1808,7 +2283,6 @@ function endGame(win, bot) {
         document.getElementById('end-title').innerText = "BẠN THẮNG!";
         document.getElementById('end-title').style.color = "#22c55e";
         document.getElementById('end-subtitle').innerText = "Bạn đã trốn thoát thành công và hãy tận hưởng kỳ nghỉ hè dài đằng đẳng của bạn!";
-        setTimeout(() => { playSound('assets/winning.mp3'); }, 100);
     } else {
         document.getElementById('end-title').innerText = "BỊ BẮT RỒI!";
         document.getElementById('end-title').style.color = "red";
@@ -1860,7 +2334,7 @@ function resetGameState() {
         isTanGod: false, tanGodEnd: 0,
         isTanSharingan: false, tanSharinganEnd: 0,
         isTanHunter: false, tanHunterEnd: 0,
-        countKills: 0,
+        countKills: 0, totalKills: 0,
         isThoaiSlow: false, thoaisuperSlowEnd: 0,
         isThoaiBoosted: false, thoaiBoostedEnd: 0,
         isThoaiHunter: false, thoaiHunterEnd: 0,
@@ -2070,7 +2544,6 @@ function saveSettings() {
     applySettings(settings);
     
     closeSettings();
-    console.log('Settings saved:', settings);
 }
 
 function applySettings(settings) {
