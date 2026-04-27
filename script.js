@@ -687,15 +687,6 @@ function checkCollision(x, y, ignoreWalls = false) {
     return false;
 }
 
-// Kiểm tra va chạm theo từng hướng cụ thể
-function checkCollisionDir(x, y, dirX, dirY, ignoreWalls = false) {
-    // Thử di chuyển theo hướng chính
-    if (checkCollision(x + dirX * 0.01, y + dirY * 0.01, ignoreWalls)) {
-        return true;
-    }
-    return false;
-}
-
 function resolveWallStick() {
     if (checkCollision(player.x, player.y)) {
         const dirs = [[0.1, 0], [-0.1, 0], [0, 0.1], [0, -0.1]];
@@ -711,17 +702,73 @@ function resolveWallStick() {
     }
 }
 
-// Di chuyển player với cơ chế sát tường và trượt
+// Di chuyển player với cơ chế sát tường và trượt từng chút một
 function movePlayerWithSlide(moveX, moveY, speed) {
     if (moveX === 0 && moveY === 0) return false;
     
     let moved = false;
-    const originalX = player.x;
-    const originalY = player.y;
+    const stepSize = 0.02; // Bước di chuyển nhỏ để kiểm tra
     
-    // Thử di chuyển theo cả hai hướng (đường chéo)
+    // Hàm thử di chuyển với slide dọc theo tường
+    const tryMove = (dx, dy, primaryAxis) => {
+        const fullDist = primaryAxis === 'x' ? Math.abs(moveX) * speed : Math.abs(moveY) * speed;
+        const steps = Math.ceil(fullDist / stepSize);
+        const stepX = (dx * speed) / steps;
+        const stepY = (dy * speed) / steps;
+        
+        for (let i = 0; i < steps; i++) {
+            const newX = player.x + stepX;
+            const newY = player.y + stepY;
+            
+            if (!checkCollision(newX, newY)) {
+                player.x = newX;
+                player.y = newY;
+                moved = true;
+            } else {
+                // Va chạm - thử slide dọc theo trục khác
+                if (primaryAxis === 'x') {
+                    // Đang di chuyển theo X, thử slide theo Y
+                    if (dy === 0) {
+                        // Thử lên/xuống một chút để sát tường
+                        for (let offset = stepSize; offset < 0.5; offset += stepSize) {
+                            if (!checkCollision(newX, player.y + offset)) {
+                                player.y += offset;
+                                moved = true;
+                                break;
+                            }
+                            if (!checkCollision(newX, player.y - offset)) {
+                                player.y -= offset;
+                                moved = true;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    // Đang di chuyển theo Y, thử slide theo X
+                    if (dx === 0) {
+                        for (let offset = stepSize; offset < 0.5; offset += stepSize) {
+                            if (!checkCollision(player.x + offset, newY)) {
+                                player.x += offset;
+                                moved = true;
+                                break;
+                            }
+                            if (!checkCollision(player.x - offset, newY)) {
+                                player.x -= offset;
+                                moved = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                // Dừng lại nếu không thể tiếp tục
+                break;
+            }
+        }
+    };
+    
+    // Xử lý di chuyển đường chéo
     if (moveX !== 0 && moveY !== 0) {
-        const diagSpeed = speed * 0.707; // Tốc độ đường chéo
+        const diagSpeed = speed * 0.707;
         
         // Thử đường chéo trực tiếp
         if (!checkCollision(player.x + moveX * diagSpeed, player.y + moveY * diagSpeed)) {
@@ -729,7 +776,7 @@ function movePlayerWithSlide(moveX, moveY, speed) {
             player.y += moveY * diagSpeed;
             moved = true;
         } else {
-            // Thử từng hướng riêng (trượt dọc theo tường)
+            // Thử từng trục riêng (slide dọc tường)
             // Thử X trước
             if (!checkCollision(player.x + moveX * speed, player.y)) {
                 player.x += moveX * speed;
@@ -742,61 +789,23 @@ function movePlayerWithSlide(moveX, moveY, speed) {
             }
         }
     } else {
-        // Di chuyển thẳng (WASD)
+        // Di chuyển thẳng (WASD) với slide từng chút một
         if (moveX !== 0) {
-            if (!checkCollision(player.x + moveX * speed, player.y)) {
-                player.x += moveX * speed;
-                moved = true;
-            } else {
-                // Thử trượt dọc theo trục Y (sát tường)
-                for (let offset = 0.1; offset < 0.5; offset += 0.05) {
-                    if (!checkCollision(player.x + moveX * speed, player.y + offset)) {
-                        player.x += moveX * speed;
-                        player.y += offset;
-                        moved = true;
-                        break;
-                    }
-                    if (!checkCollision(player.x + moveX * speed, player.y - offset)) {
-                        player.x += moveX * speed;
-                        player.y -= offset;
-                        moved = true;
-                        break;
-                    }
-                }
-            }
+            tryMove(moveX, 0, 'x');
         }
         if (moveY !== 0) {
-            if (!checkCollision(player.x, player.y + moveY * speed)) {
-                player.y += moveY * speed;
-                moved = true;
-            } else {
-                // Thử trượt dọc theo trục X (sát tường)
-                for (let offset = 0.1; offset < 0.5; offset += 0.05) {
-                    if (!checkCollision(player.x + offset, player.y + moveY * speed)) {
-                        player.x += offset;
-                        player.y += moveY * speed;
-                        moved = true;
-                        break;
-                    }
-                    if (!checkCollision(player.x - offset, player.y + moveY * speed)) {
-                        player.x -= offset;
-                        player.y += moveY * speed;
-                        moved = true;
-                        break;
-                    }
-                }
-            }
+            tryMove(0, moveY, 'y');
         }
     }
     
-    // Kiểm tra và xử lý nếu vẫn còn trong tường
+    // Xử lý khi bị kẹt trong tường - dịch chuyển từng chút một để thoát
     if (checkCollision(player.x, player.y)) {
-        // Thử di chuyển từng chút một để thoát ra
-        const dirs = [
-            [0.01, 0], [-0.01, 0], [0, 0.01], [0, -0.01],
-            [0.01, 0.01], [-0.01, 0.01], [0.01, -0.01], [-0.01, -0.01]
+        const escapeDirs = [
+            [stepSize, 0], [-stepSize, 0], [0, stepSize], [0, -stepSize],
+            [stepSize, stepSize], [-stepSize, stepSize], [stepSize, -stepSize], [-stepSize, -stepSize]
         ];
-        for (let [dx, dy] of dirs) {
+        
+        for (let [dx, dy] of escapeDirs) {
             if (!checkCollision(player.x + dx, player.y + dy)) {
                 player.x += dx;
                 player.y += dy;
@@ -1581,10 +1590,16 @@ function update(timestamp) {
     }
     let pSpd = baseSpd * mult * timeScale;
     if (pSpd > 0) {
-        if (keys.w && !checkCollision(player.x, player.y - pSpd)) {player.y -= pSpd; player.isMoving = true;}
-        if (keys.s && !checkCollision(player.x, player.y + pSpd)) {player.y += pSpd; player.isMoving = true;}
-        if (keys.a && !checkCollision(player.x - pSpd, player.y)) {player.x -= pSpd; player.isMoving = true;}
-        if (keys.d && !checkCollision(player.x + pSpd, player.y)) {player.x += pSpd; player.isMoving = true;}
+        let moveX = 0, moveY = 0;
+        if (keys.w) moveY = -1;
+        if (keys.s) moveY = 1;
+        if (keys.a) moveX = -1;
+        if (keys.d) moveX = 1;
+        
+        // Sử dụng hàm movePlayerWithSlide để có cơ chế sát tường và trượt
+        if (movePlayerWithSlide(moveX, moveY, pSpd)) {
+            player.isMoving = true;
+        }
     }
     // give the player an aura when invincible
     if (player.isInvincible) {
