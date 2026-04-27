@@ -6,15 +6,8 @@ const ctx = canvas.getContext('2d');
 const version = "1.2 (preview, build 7)";
 const debugmode = true;
 
-// GAME CONFIG - Tùy chỉnh tốc độ game - WIP
-const TARGET_FPS = 144; // Tần số quét mục tiêu (30, 60, 120, 144, etc.)
-const TARGET_FRAME_TIME = 1000 / TARGET_FPS; // Thời gian mỗi frame (ms)
-
-// Visual Effects Config - WIP
-const ENABLE_SHADOW_EFFECTS = false; // Bật/tắt shadow blur (tắt để tăng FPS)
-const MAX_SHOCKWAVES = 25; // Giới hạn shockwaves
-const MAX_TRAILS = 20; // Giới hạn trails
-const MAX_PARTICLES = 50; // Giới hạn particles
+// GAME CONFIG - Tùy chỉnh tốc độ game (sẽ được load từ settings)
+// Xem thêm trong phần SETTINGS SYSTEM ở cuối file
 
 let ROWS, COLS, TILE_SIZE;
 let maze = [];
@@ -61,6 +54,14 @@ let yCD = 0, uCD = 0, iCD = 0, oCD = 0, freezeEnd = 0, lastBotSpawnTime = 0;
 let shakeAmount = 0, showRoad = false;
 let alarmSoundPlaying = false;
 let isRaging = false;
+
+// Global variables for settings (can be modified by settings system)
+var TARGET_FPS = 60;
+var TARGET_FRAME_TIME = 1000 / TARGET_FPS;
+var ENABLE_SHADOW_EFFECTS = false;
+var MAX_SHOCKWAVES = 25;
+var MAX_TRAILS = 20;
+var MAX_PARTICLES = 50;
 
 var filterStrength = 20;
 var frameTime = 0, lastLoop = new Date, thisLoop;
@@ -233,8 +234,9 @@ function generateMaze() {
     walk(1, 1);
     maze[ROWS - 2][COLS - 2] = 'K';
     
-    // Create maze cache for performance
+    // Create maze cache for performance (both normal and rage versions)
     createMazeCache();
+    createMazeCacheRage();
 }
 
 function createMazeCache() {
@@ -1385,10 +1387,9 @@ function update(timestamp) {
                 }
             }
         }
-        const fpx = Math.floor(player.x), fpy = Math.floor(player.y);
         bots.forEach(b => {
             const bx = Math.floor(b.x), by = Math.floor(b.y);
-            if (Math.abs(bx - fpx) <= 1 && Math.abs(by - fpy) <= 1) {
+            if (Math.abs(bx - px) <= 1 && Math.abs(by - py) <= 1) {
                 b.isDead = true;
                 spawnShockwave(b.x, b.y, '#d97706');
                 spawnShockwave(b.x, b.y, '#fbbf24');
@@ -1396,6 +1397,9 @@ function update(timestamp) {
                 playSound('assets/kill.mp3', 0.8);
             }
         });
+        // Force redraw ngay lập tức
+        createMazeCache();
+        draw(isCommonRage & isRageable); // Vẽ với cache mới
     }
 
     // QUANG GRAVITY VISUAL: pull bots toward player while gravity active
@@ -2005,3 +2009,134 @@ document.getElementById('vers').innerText = 'V' + version;
 selectChar('khang');
 selectMode('normal');
 selectBot('quyen');
+
+// Load settings from file on startup
+loadSettings();
+
+/**
+ * SETTINGS SYSTEM
+ */
+function openSettings() {
+    document.getElementById('settings-modal').classList.remove('hidden');
+    loadSettingsToUI();
+}
+
+function closeSettings() {
+    document.getElementById('settings-modal').classList.add('hidden');
+}
+
+function loadSettingsToUI() {
+    // Load current values to UI
+    document.getElementById('setting-fps').value = TARGET_FPS;
+    document.getElementById('setting-debug').innerText = debugmode ? 'ON' : 'OFF';
+    document.getElementById('setting-shadow').innerText = ENABLE_SHADOW_EFFECTS ? 'ON' : 'OFF';
+    document.getElementById('setting-shockwaves').value = MAX_SHOCKWAVES;
+    document.getElementById('setting-trails').value = MAX_TRAILS;
+}
+
+function toggleDebug() {
+    const btn = document.getElementById('setting-debug');
+    btn.innerText = btn.innerText === 'ON' ? 'OFF' : 'ON';
+}
+
+function toggleShadow() {
+    const btn = document.getElementById('setting-shadow');
+    btn.innerText = btn.innerText === 'ON' ? 'OFF' : 'ON';
+}
+
+function saveSettings() {
+    const settings = {
+        game: {
+            targetFPS: parseInt(document.getElementById('setting-fps').value),
+            debugMode: document.getElementById('setting-debug').innerText === 'ON'
+        },
+        visual: {
+            enableShadowEffects: document.getElementById('setting-shadow').innerText === 'ON',
+            maxShockwaves: parseInt(document.getElementById('setting-shockwaves').value),
+            maxTrails: parseInt(document.getElementById('setting-trails').value),
+            maxParticles: 50
+        },
+        difficulty: {
+            gameMode: gameMode,
+            selectedBot: selectedBot,
+            selectedChar: selectedChar
+        }
+    };
+
+    // Save to localStorage (for web environment)
+    localStorage.setItem('gameSettings', JSON.stringify(settings));
+    
+    // Apply settings immediately
+    applySettings(settings);
+    
+    closeSettings();
+    console.log('Settings saved:', settings);
+}
+
+function applySettings(settings) {
+    // Apply game settings
+    if (settings.game) {
+        TARGET_FPS = settings.game.targetFPS || 60;
+        TARGET_FRAME_TIME = 1000 / TARGET_FPS;
+        // Update global variable for debugmode
+        window.debugmode = settings.game.debugMode !== undefined ? settings.game.debugMode : true;
+    }
+    
+    // Apply visual settings
+    if (settings.visual) {
+        ENABLE_SHADOW_EFFECTS = settings.visual.enableShadowEffects !== undefined ? settings.visual.enableShadowEffects : false;
+        MAX_SHOCKWAVES = settings.visual.maxShockwaves || 25;
+        MAX_TRAILS = settings.visual.maxTrails || 20;
+    }
+}
+
+function loadSettings() {
+    try {
+        // Try to load from localStorage first
+        let settings = localStorage.getItem('gameSettings');
+        
+        if (settings) {
+            settings = JSON.parse(settings);
+            applySettings(settings);
+            console.log('Settings loaded from localStorage');
+        } else {
+            // Try to fetch from file (for file:// protocol)
+            fetch('setting.json')
+                .then(response => response.json())
+                .then(settings => {
+                    applySettings(settings);
+                    localStorage.setItem('gameSettings', JSON.stringify(settings));
+                    console.log('Settings loaded from file');
+                })
+                .catch(() => {
+                    console.log('Using default settings');
+                });
+        }
+    } catch (e) {
+        console.log('Using default settings');
+    }
+}
+
+function resetSettings() {
+    const defaultSettings = {
+        game: {
+            targetFPS: 60,
+            debugMode: true
+        },
+        visual: {
+            enableShadowEffects: false,
+            maxShockwaves: 25,
+            maxTrails: 20,
+            maxParticles: 50
+        },
+        difficulty: {
+            gameMode: 'normal',
+            selectedBot: 'quyen',
+            selectedChar: 'khang'
+        }
+    };
+    
+    localStorage.setItem('gameSettings', JSON.stringify(defaultSettings));
+    applySettings(defaultSettings);
+    loadSettingsToUI();
+}

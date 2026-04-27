@@ -1,0 +1,17 @@
+{
+    "game": {
+        "targetFPS": 144,
+        "debugMode": true
+    },
+    "visual": {
+        "enableShadowEffects": false,
+        "maxShockwaves": 25,
+        "maxTrails": 20,
+        "maxParticles": 50
+    },
+    "difficulty": {
+        "gameMode": "normal",
+        "selectedBot": "quyen",
+        "selectedChar": "khang"
+    }
+}
