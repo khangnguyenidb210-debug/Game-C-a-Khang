@@ -560,7 +560,7 @@ audio.preload([
         channel: "music",
         name: "settingtheme",
         src: "assets/themes/setting-theme.mp3",
-        config: { loop: true }
+        config: { volume: 0.67, loop: true }
     },
     {
         channel: "music",
