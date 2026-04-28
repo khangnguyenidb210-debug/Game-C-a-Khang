@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 10)";
+const version = "1.2 (preview, build 11)";
 
 // GAME CONFIG - Tùy chỉnh tốc độ game (sẽ được load từ settings)
 // Xem thêm trong phần SETTINGS SYSTEM ở cuối file
@@ -272,6 +272,7 @@ class AudioManager {
         sound.audio.currentTime = 0;
         sound.audio.play();
     }
+    
 
     // STOP
     stop(channel, name) {
@@ -503,25 +504,30 @@ audio.preload([
         channel: "sfx",
         name: "trung-thechildofthewindgod",
         src: "assets/trung/the-child-of-the-wind-god.mp3",
-        config: { volume: 0.45 }
+        config: { volume: 0.5 }
     },
     {
         channel: "sfx",
         name: "trung-rasengan",
         src: "assets/trung/rasengan.mp3",
-        config: { volume: 0.67 }
+        config: { volume: 0.7 }
     },
     {
         channel: "sfx",
         name: "trung-katanaschwing",
         src: "assets/trung/katana-schwing.mp3",
-        config: { volume: 0.5 }
+        config: { volume: 0.55 }
     },
     {
         channel: "sfx",
         name: "trung-hasagi",
         src: "assets/trung/hasagi.mp3",
-        config: { volume: 0.7 }
+        config: { volume: 0.8 }
+    },
+    {
+        channel: "sfx",
+        name: "trung-windhit",
+        src: "assets/trung/wind-hit.mp3"
     },
     // Others audio
     {
@@ -563,17 +569,40 @@ audio.preload([
     },
     {
         channel: "music",
-        name: "settingtheme",
-        src: "assets/themes/setting-theme.mp3",
+        name: "settingtheme1",
+        src: "assets/themes/setting-theme1.mp3",
         config: { volume: 0.67, loop: true }
     },
     {
         channel: "music",
-        name: "gametheme",
-        src: "assets/themes/game-theme.mp3",
+        name: "settingtheme2",
+        src: "assets/themes/setting-theme2.mp3",
+        config: { volume: 0.5, loop: true }
+    },
+    {
+        channel: "music",
+        name: "gametheme1",
+        src: "assets/themes/game-theme1.mp3",
+        config: { volume: 0.67, loop: true }
+    },
+    {
+        channel: "music",
+        name: "gametheme2",
+        src: "assets/themes/game-theme2.mp3",
+        config: { volume: 0.67, loop: true }
+    },
+    {
+        channel: "music",
+        name: "gametheme3",
+        src: "assets/themes/game-theme3.mp3",
         config: { volume: 0.67, loop: true }
     }
 ]);
+
+document.onclick = () => {
+    audio.play("sfx", "click");
+};
+
 // Cảnh báo phẫn nộ
 function playAlarm() {
     if (alarmSoundPlaying) return;
@@ -1671,7 +1700,7 @@ function update(timestamp) {
                 for (let i = 0; i < 10; i++) {
                     setTimeout(() => spawnShockwave(player.trungRasenganX, player.trungRasenganY, i % 2 ? '#38bdf8' : '#ffffff'), i * 50);
                 }
-                audio.play("sfx", "trung-rasengan");
+                audio.play("sfx", "trung-windhit");
                 player.isTrungRasengan = false;
             }
         });
@@ -2400,7 +2429,7 @@ function handleClickToStart() {
 }
 
 function returnToGame() {
-    audio.play("music", "gametheme");
+    playRandomGameTheme()
     resetGameState();
     document.getElementById('game-over').classList.add('hidden');
     document.getElementById('selection-screen').classList.add('hidden');
@@ -2484,7 +2513,7 @@ window.selectBot = (b) => {
 
 document.getElementById('start-btn').onclick = () => {
     audio.stop("music", "mainmenu");
-    audio.play("music", "gametheme");
+    playRandomGameTheme()
     resetGameState();
     document.getElementById('selection-screen').classList.add('hidden');
     document.getElementById('game-ui').classList.remove('hidden');
@@ -2515,6 +2544,13 @@ window.addEventListener('keyup', e => {
     if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = false;
 });
 
+// Click on canvas to unpause
+canvas.addEventListener('click', () => {
+    if (gamePaused) {
+        togglePause();
+    }
+});
+
 var fpsOut = document.getElementById('fps-counter');
 setInterval(function(){
     fpsOut.innerHTML = (frameTime ? Math.round(1000/frameTime) : "-") + " fps";
@@ -2534,16 +2570,30 @@ loadSettings();
 /**
  * SETTINGS SYSTEM
  */
+
+// Random theme players
+function playRandomGameTheme() {
+    const themes = ["gametheme1", "gametheme2", "gametheme3"];
+    const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+    audio.play("music", randomTheme);
+}
+
+function playRandomSettingTheme() {
+    const themes = ["settingtheme1", "settingtheme2"];
+    const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+    audio.play("music", randomTheme);
+}
+
 function openSettings() {
     document.getElementById('settings-modal').classList.remove('hidden');
-    audio.play("music", "settingtheme");
+    playRandomSettingTheme();
     audio.stop("music", "mainmenu");
     loadSettingsToUI();
 }
 
 function closeSettings() {
     document.getElementById('settings-modal').classList.add('hidden');
-    audio.stop("music", "settingtheme");
+    audio.stopChannel("music");
     audio.play("music", "mainmenu");
 }
 

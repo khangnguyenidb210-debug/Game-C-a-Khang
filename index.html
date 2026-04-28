@@ -284,6 +284,7 @@
                 <div class="skill-slot border-yellow-500/50"><div id="cd-o" class="cd-overlay bg-yellow-500/40"></div><span class="z-10 font-bold text-yellow-500">O</span></div>
             </div>
         </div>
+        <!-- Debug In-game -->
         <div id="debug" class="hidden absolute bottom-2 left-2 text-xm font-bold text-slate-500 uppercase tracking-widest">Debug</div>
     </div>
 
@@ -309,9 +310,10 @@
         <img src="assets/thoai/ngan-thot.jpeg" alt="NganThot" class="w-full h-full object-cover">
     </div>
 
-    <div id="pause-overlay" class="hidden absolute inset-0 z-[205] bg-black/80 flex flex-col items-center justify-center text-center p-10">
+    <!-- Pause -->
+    <div id="pause-overlay" class="hidden absolute inset-0 z-[205] bg-black/80 flex flex-col items-center justify-center text-center p-10" onclick="togglePause()">
         <div class="text-5xl font-black uppercase tracking-[0.3em] text-white mb-4">Tạm dừng</div>
-        <div class="text-sm uppercase tracking-[0.4em] text-slate-300">Nhấn Esc hoặc P để tiếp tục</div>
+        <div class="text-sm uppercase tracking-[0.4em] text-slate-300">Click vào màn hình hoặc nhấn [Esc]/[P] để tiếp tục</div>
     </div>
 
     <div id="game-over" class="hidden absolute inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center text-center p-10">
