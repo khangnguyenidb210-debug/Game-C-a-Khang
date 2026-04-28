@@ -3,8 +3,12 @@
         "targetFPS": 144,
         "debugMode": true
     },
+    "audio": {
+        "muteThemes": false,
+        "muteSFX": false
+    },
     "visual": {
-        "enableShadowEffects": false,
+        "enableShadowEffects": true,
         "maxShockwaves": 25,
         "maxTrails": 20,
         "maxParticles": 50

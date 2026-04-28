@@ -10,6 +10,24 @@
 <body class="flex items-center justify-center min-h-screen">
 
     <div id="fps-counter" class="absolute top-2 right-2 text-xm font-bold text-slate-500 uppercase tracking-widest">FPS <!-- FPS --></div>
+    
+    <!-- CLICK TO START SCREEN -->
+    <div id="click-to-start" class="absolute inset-0 z-[120] flex flex-col items-center justify-center bg-[#020617] cursor-pointer" onclick="handleClickToStart()">
+        <div class="text-center">
+            <h1 class="text-6xl md:text-7xl font-black mb-4 text-white tracking-tighter glitch uppercase">Welcome To</h1>
+            <h2 class="text-3xl md:text-7xl font-black mb-12 text-green tracking-tighter glitch uppercase">EF3T</h2>
+            <div class="mb-3 p-12">
+                <p class="text-2xl md:text-4xl font-bold text-white uppercase tracking-widest mb-4">Warning</p>
+                <p class="text-2xl md:text-2xl font-bold text-slate-400 uppercase tracking-widest mb-4">Game này có nhiều tiếng ồn và hình ảnh flash!</p>
+                <p class="text-2xl md:text-3xl font-bold text-white uppercase tracking-widest mb-4 animate-pulse">Bạn đã được cảnh báo!</p>
+            </div>
+            
+            <p class="text-4xl p-14 md:text-3xl text-green-500 font-bold uppercase animate-pulse">Click nếu bạn đã sẵn sàng</p>
+            
+            <p class="absolute bottom-2 left-1/2 -translate-x-1/2 text-xm font-bold text-slate-700 uppercase tracking-widest">Đây là phiên bản thử nghiệm, mọi thứ trong game đếu có thể thay đổi</p>
+        </div>
+    </div>
+    
     <!-- SELECTION SCREEN -->
     <div id="selection-screen" class="absolute inset-0 z-[110] flex flex-col items-center justify-start bg-[#020617] p-6 text-center overflow-y-auto">
         <!-- TITLE & INFO -->
@@ -315,31 +333,60 @@
             
             <!-- Game Settings -->
             <div class="mb-6">
-                <h3 class="text-sm font-bold uppercase text-slate-400 mb-3">Game</h3>
+                <h3 class="text-sml font-bold uppercase text-white mb-4">Gameplay</h3>
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
                         <label class="text-slate-300">Target FPS</label>
                         <select id="setting-fps" class="bg-slate-800 border border-slate-600 text-white px-3 py-2 rounded-lg">
-                            <option value="30">30 FPS</option>
                             <option value="60" selected>60 FPS</option>
                             <option value="120">120 FPS</option>
                             <option value="144">144 FPS</option>
+                            <option value="244">244 FPS</option>
                         </select>
                     </div>
                     <div class="flex justify-between items-center">
                         <label class="text-slate-300">Debug Mode</label>
-                        <button id="setting-debug" onclick="toggleDebug()" class="px-4 py-2 rounded-lg border border-slate-600 bg-slate-800 text-slate-400">OFF</button>
+                        <label class="switch">
+                            <input class="toggle" type="checkbox" id="setting-debug-toggle" onchange="toggleDebug()" />
+                            <span class="slider"></span>
+                            <span class="card-side"></span>
+                        </label>
                     </div>
                 </div>
             </div>
-
+            <!-- Audio Settings -->
+            <div class="mb-6">
+                <h3 class="text-sl font-bold uppercase text-white mb-4">Audio</h3>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <label class="text-slate-300">Mute Themes</label>
+                        <label class="switch">
+                            <input class="toggle" type="checkbox" id="setting-themes-toggle" onchange="toggleThemes()" />
+                            <span class="slider"></span>
+                            <span class="card-side"></span>
+                        </label>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <label class="text-slate-300">Mute SFX</label>
+                        <label class="switch">
+                            <input class="toggle" type="checkbox" id="setting-sfx-toggle" onchange="toggleSFX()" />
+                            <span class="slider"></span>
+                            <span class="card-side"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
             <!-- Visual Settings -->
             <div class="mb-6">
-                <h3 class="text-sm font-bold uppercase text-slate-400 mb-3">Visual Effects</h3>
+                <h3 class="text-sl font-bold uppercase text-white mb-4">Visual Effects</h3>
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
                         <label class="text-slate-300">Shadow Effects</label>
-                        <button id="setting-shadow" onclick="toggleShadow()" class="px-4 py-2 rounded-lg border border-slate-600 bg-slate-800 text-slate-400">OFF</button>
+                        <label class="switch">
+                            <input class="toggle" type="checkbox" id="setting-shadow-toggle" onchange="toggleShadow()" />
+                            <span class="slider"></span>
+                            <span class="card-side"></span>
+                        </label>
                     </div>
                     <div class="flex justify-between items-center">
                         <label class="text-slate-300">Max Shockwaves</label>

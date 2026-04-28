@@ -3,8 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 8)";
-const debugmode = true;
+const version = "1.2 (preview, build 10)";
 
 // GAME CONFIG - Tùy chỉnh tốc độ game (sẽ được load từ settings)
 // Xem thêm trong phần SETTINGS SYSTEM ở cuối file
@@ -53,16 +52,18 @@ let selectedBot = 'quyen', selectedChar = 'khang', gameMode = 'normal';
 let yCD = 0, uCD = 0, iCD = 0, oCD = 0, freezeEnd = 0, lastBotSpawnTime = 0;
 let shakeAmount = 0, showRoad = false;
 let alarmSoundPlaying = false;
-let isRaging = false;
+let isLuomMoveAudio = false, isRaging = false;
 
 // Global variables for settings (can be modified by settings system)
 var TARGET_FPS = 60;
 var TARGET_FRAME_TIME = 1000 / TARGET_FPS;
 var ENABLE_SHADOW_EFFECTS = false;
+var DEBUG_MODE = true;
 var MAX_SHOCKWAVES = 25;
 var MAX_TRAILS = 20;
 var MAX_PARTICLES = 50;
-
+var MUTE_THEMES = false;
+var MUTE_SFX = false;
 var filterStrength = 20;
 var frameTime = 0, lastLoop = new Date, thisLoop;
 var lastUpdateTime = 0, deltaTime = 0;
@@ -72,9 +73,9 @@ const COOLDOWNS = {
     khang: { y: 4000, u: 12000, i: 3000, o: 18000 },
     dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
     loi: { y: 6000, u: 12000, i: 6000, o: 18000 },
-    tan:  { y: 7000, u: 7000, i: 8000, o: 25000 }, // dev character
-    thoai: { y: 6000, u: 7000, i: 11000, o: 25000 },
-    quang: { y: 12000, u: 20000, i: 12000, o: 25000 },
+    tan:  { y: 12000, u: 15000, i: 18000, o: 30000 },
+    thoai: { y: 7000, u: 7000, i: 12000, o: 30000 },
+    quang: { y: 12000, u: 20000, i: 12000, o: 30000 },
     trung: { y: 15000, u: 14000, i: 8000, o: 18000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
@@ -143,7 +144,7 @@ function pauseGame() {
     gameActive = false;
     resetInputKeys();
     setPauseOverlay(true);
-    playSfx(220, 'triangle', 0.25, 0.1);
+    if (!MUTE_SFX) playSfx(220, 'triangle', 0.25, 0.1);
 }
 
 function resumeGame() {
@@ -153,7 +154,7 @@ function resumeGame() {
     gamePaused = false;
     gameActive = true;
     setPauseOverlay(false);
-    playSfx(440, 'triangle', 0.2, 0.12);
+    if (!MUTE_SFX) playSfx(440, 'triangle', 0.2, 0.12);
     update();
 }
 
@@ -164,7 +165,7 @@ function togglePause() {
 }
 
 /**
- * SOUND ENGINE (LEGACY)
+ * AUDIO ENGINE (LEGACY)
  */
 
 function playSound(url, vol = 1.0) {
@@ -198,7 +199,7 @@ function playSfx(f, t, d, v = 0.1, s = 0) {
 }
 
 /**
- * SOUND ENGINE
+ * AUDIO ENGINE (NEW)
  */
 class AudioManager {
     constructor() {
@@ -208,7 +209,6 @@ class AudioManager {
             ui: {},
             ambient: {}
         };
-
         this.masterVolume = 1;
         this.channelVolume = {
             music: 1,
@@ -225,7 +225,6 @@ class AudioManager {
     preload(list, callback = null) {
         this.total = list.length;
         this.loaded = 0;
-
         for (const item of list) {
             this.load(
                 item.channel,
@@ -234,7 +233,6 @@ class AudioManager {
                 item.config,
                 () => {
                     this.loaded++;
-
                     if (callback)
                         callback(this.loaded, this.total);
 
@@ -249,17 +247,14 @@ class AudioManager {
     // LOAD
     load(channel, name, src, config = {}, onLoaded = null) {
         const audio = new Audio();
-
         audio.preload = "auto";
         audio.src = src;
         audio.volume = config.volume ?? 1;
         audio.loop = config.loop ?? false;
         audio.playbackRate = config.speed ?? 1;
-
         audio.addEventListener("canplaythrough", () => {
             if (onLoaded) onLoaded();
         }, { once: true });
-
         this.channels[channel][name] = {
             audio: audio,
             baseVolume: config.volume ?? 1,
@@ -275,7 +270,6 @@ class AudioManager {
     play(channel, name) {
         const sound = this.channels[channel][name];
         if (!sound) return;
-
         sound.audio.currentTime = 0;
         sound.audio.play();
     }
@@ -291,10 +285,8 @@ class AudioManager {
 
     stopChannel(channel) {
         if (!this.channels[channel]) return;
-
         for (let name in this.channels[channel]) {
             const sound = this.channels[channel][name];
-
             sound.audio.pause();
             sound.audio.currentTime = 0;
         }
@@ -304,7 +296,6 @@ class AudioManager {
     updateVolume(channel, name) {
         const sound = this.channels[channel][name];
         if (!sound) return;
-
         sound.audio.volume =
             sound.baseVolume *
             this.channelVolume[channel] *
@@ -313,7 +304,6 @@ class AudioManager {
 
     setMasterVolume(vol) {
         this.masterVolume = vol;
-
         for (let channel in this.channels)
             for (let name in this.channels[channel])
                 this.updateVolume(channel, name);
@@ -351,7 +341,7 @@ audio.preload([
         channel: "sfx",
         name: "luom-move",
         src: "assets/luom/move.mp3",
-        config: { volume: 0.35 }
+        config: { volume: 0.6 }
     },
     // Khang's audio
     {
@@ -557,13 +547,26 @@ audio.preload([
         name: "win",
         src: "assets/sfx/win.mp3"
     },
+    // Themes
+    {
+        channel: "music",
+        name: "mainmenu",
+        src: "assets/themes/main-menu.mp3",
+        config: { volume: 0.6, loop: true }
+    },
+    {
+        channel: "music",
+        name: "gametheme",
+        src: "assets/themes/game-theme.mp3",
+        config: { volume: 0.6, loop: true }
+    }
 ]);
 
 // Cảnh báo phẫn nộ
 function playAlarm() {
     if (alarmSoundPlaying) return;
     alarmSoundPlaying = true;
-    playSfx(600, 'square', 0.5, 0.05, 800);
+    if (!MUTE_SFX) playSfx(600, 'square', 0.5, 0.05, 800);
     setTimeout(() => { alarmSoundPlaying = false; }, 1000);
 }
 
@@ -957,12 +960,13 @@ function useY() {
         }
         audio.play("sfx", "quang-stomp");
         bots.forEach(b => {
+            b.isDelayed = true;
             b.delayUntil = now + 4500;
             b.quangEarthquakeSlowUntil = now + 4500;
         });
         yCD = now + COOLDOWNS.quang.y * (selectedBot === 'anh' ? 1.5 : 1);
     } else if (selectedChar === 'trung') {
-        // CON CỦA THẦN GIÓ: 2x speed + ghost through bots 5s, then tired 0.5x for 2s
+        // CON CỦA THẦN GIÓ: 2x speed + ghost through bots 5s, then tired 0.5x for 1s
         player.isTrungWindGod = true;
         player.trungWindGodEnd = now + 5000;
         player.isGhost = true;
@@ -976,9 +980,9 @@ function useY() {
             player.isTrungWindGod = false;
             player.isGhost = false;
             player.isTrungTired = true;
-            player.trungTiredEnd = now + 7000; // 5s wind + 2s tired
+            player.trungTiredEnd = now + 6000; // 5s wind + 1s tired
             spawnShockwave(player.x, player.y, '#94a3b8');
-            playSfx(200, 'sine', 0.3, 0.2, 100);
+            if (!MUTE_SFX) playSfx(200, 'sine', 0.3, 0.2, 100);
         }, 5000);
         yCD = now + COOLDOWNS.trung.y * (selectedBot === 'anh' ? 1.5 : 1);
     }
@@ -1005,6 +1009,7 @@ function useU() {
             if (d < 5) {
                 b.x += (dx / d) * 4;
                 b.y += (dy / d) * 4;
+                b.isDelayed = true;
                 b.delayUntil = now + 2000;
                 isPunchSuccess = true;
             }
@@ -1051,13 +1056,14 @@ function useU() {
             b.superRageEnd = now + 6000;
         });
         spawnShockwave(player.x, player.y, '#fbbf24');
-        playSfx(400, 'square', 0.4);
+        if (!MUTE_SFX) (400, 'square', 0.4);
     } else if (selectedChar === 'tan') {
         // SHARINGAN: screen red, all bots delayed 10s, then 3x rage for 3s after
         player.isTanSharingan = true;
         player.tanSharinganEnd = now + 10000;
         shakeAmount = 30;
         bots.forEach(b => {
+            b.isDelayed = true;
             b.delayUntil = now + 10000;
             b.superRageStart = now + 10000;
             b.superRageEnd = now + 13000;
@@ -1077,7 +1083,7 @@ function useU() {
         for (let i = 0; i < 12; i++) {
             setTimeout(() => {
                 spawnShockwave(player.x, player.y, i % 2 ? '#ef4444' : '#7f1d1d');
-                playSfx(80 + i * 30, 'sawtooth', 0.2, 0.25);
+                if (!MUTE_SFX) playSfx(80 + i * 30, 'sawtooth', 0.2, 0.25);
             }, i * 100);
         }
     } else if (selectedChar === 'thoai') {
@@ -1103,8 +1109,9 @@ function useU() {
         player.isQuangGravity = true;
         player.quangGravityEnd = now + 5000;
         bots.forEach(b => {
-            b.delayUntil = now + 3000;
-            b.quangGravityUntil = now + 3000;
+            b.isDelayed = true;
+            b.delayUntil = now + 5000;
+            b.quangGravityUntil = now + 5000;
         });
         // Spawn pulsing purple shockwaves
         for (let i = 0; i < 14; i++) {
@@ -1113,7 +1120,7 @@ function useU() {
                 if (i < 6) shakeAmount = Math.max(shakeAmount, 15);
             }, i * 200);
         }
-        playSfx(80, 'sine', 0.5, 0.35, 40);
+        if (!MUTE_SFX) playSfx(80, 'sine', 0.5, 0.35, 40);
     } else if (selectedChar === 'trung') {
         // HASAGI: wild shockwave push everyone through the maze
         shakeAmount = 35;
@@ -1131,6 +1138,7 @@ function useU() {
             const pushDist = 8;
             b.x = Math.max(1, Math.min(COLS - 2, b.x + (dx / d) * pushDist));
             b.y = Math.max(1, Math.min(ROWS - 2, b.y + (dy / d) * pushDist));
+            b.isDelayed = true;
             b.delayUntil = now + 2000;
         });
         // Resolve bots that landed in walls
@@ -1164,7 +1172,7 @@ function useI() {
             });
             player.khangTraps--;
             document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: ${player.khangTraps}`;
-            playSfx(900, 'sine', 0.1);
+            if (!MUTE_SFX) playSfx(900, 'sine', 0.1);
         } else iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1)
         return;
     }
@@ -1176,7 +1184,7 @@ function useI() {
             life: now + 10000,
             isGlowing: false
         });
-        playSfx(700, 'sine', 0.3);
+        if (!MUTE_SFX) playSfx(700, 'sine', 0.3);
     } else if (selectedChar === 'dang') {
         player.parryEnd = now + 1250;
         player.invincibleEnd = now + 1250;
@@ -1186,7 +1194,7 @@ function useI() {
         spawnShockwave(player.x, player.y, '#cecece');
     } else if (selectedChar === 'loi') {
         decoys.push({ x: player.x, y: player.y, lifeEnd: now + 8000 });
-        playSfx(700, 'sine', 0.3);
+        if (!MUTE_SFX) playSfx(700, 'sine', 0.3);
     } else if (selectedChar === 'tan') {
         // THE SECOND: all bots disappear instantly
         if (bots.length > 0) {
@@ -1196,9 +1204,10 @@ function useI() {
                 spawnShockwave(b.x, b.y, '#facc15');
             });
             audio.play("sfx", "tan-delete");
-            for (let i = 1; i < 6; i++) {
-                setTimeout(() => playSfx(150 + i * 80, 'sawtooth', 0.3, 0.3), i * 60);
-            }
+            if (!MUTE_SFX) 
+                for (let i = 1; i < 6; i++) {
+                    setTimeout(() => playSfx(150 + i * 80, 'sawtooth', 0.3, 0.3), i * 60);
+                }
             bots = [];
         }
     } else if (selectedChar === 'thoai') {
@@ -1241,6 +1250,7 @@ function useI() {
                 b.y = Math.max(1, Math.min(ROWS - 2, b.y + (dy / d) * 5));
                 b.isSlow = true;
                 b.slowEnd = now + 3500;
+                b.isDelayed = true;
                 b.delayUntil = now + 1000;
             }
         });
@@ -1271,6 +1281,8 @@ function useI() {
         // ATOMIC SLICE: dash like Khang Y, kill all bots surfed past (split effect)
         let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
         if (!dx && !dy) dy = -1;
+        player.isInvincible = true;
+        player.invincibleEnd = now + 750;
         audio.play("sfx", "trung-katanaschwing");
         const dashPositions = [];
         for (let i = 0; i < 16; i++) {
@@ -1334,6 +1346,7 @@ function useO() {
         bots.forEach(b => {
             b.x += (b.x - player.x) * 4;
             b.y += (b.y - player.y) * 4;
+            b.isDelayed = true;
             b.delayUntil = now + 5000;
         });
         bots.forEach(b => {
@@ -1398,7 +1411,7 @@ function useO() {
         player.trungRasenganEnd = now + 5000;
         player.trungRasenganX = player.x;
         player.trungRasenganY = player.y;
-        shakeAmount = 20;
+        shakeAmount = 25;
         audio.play("sfx", "trung-rasengan");
         for (let i = 0; i < 10; i++) {
             setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#38bdf8' : '#7dd3fc'), i * 80);
@@ -1466,13 +1479,11 @@ function update(timestamp) {
     }
     // Lerm movement
     let isLuomCanMove = false;
-    let tick = 500 - currentLevel * 22.5 - (isCommonRage ? 8 * currentLevel : 0) - (isHard ? 5 * currentLevel : 3 * currentLevel);
+    let tick = 500 - (currentLevel * 22.5) - (isCommonRage ? (8 * currentLevel) : 0) - (isHard ? (4 * currentLevel) : (3 * currentLevel));
     if (selectedBot === 'luom' && elapsed > tick && !(player.isQuangGravity && now < player.quangGravityEnd)) {
         const luomDur = (isHard ? 85 : 65) + (isCommonRage ? (isHard ? 10 : 8) * currentLevel : 0);
-        if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0) {
+        if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0)
             isLuomCanMove = true;
-            audio.play("sfx", "luom-move");
-        }
     }
 
     const statusEl = document.getElementById('bot-status');
@@ -1550,8 +1561,8 @@ function update(timestamp) {
     const spawnInterval = (isHard ? 2500 : 4000) - (selectedBot == 'luom' ? 1250 : 0);
     if (elapsed > 2000 - (selectedBot == 'luom' ? 1250 : 0) && (bots.length < maxBots) && (now - lastBotSpawnTime > spawnInterval)) {
         bots.push({
-            x: 1.5, y: 1.5, delayUntil: now + 500 
-                                        + ((selectedBot == 'luom' || selectedBot == 'tin') ? 250 : 0), nextPathUpdate: 0,
+            x: 1.5, y: 1.5, isDelayed: true, delayUntil: now + 500 
+                                        + ((selectedBot == 'luom' || selectedBot == 'tin') ? 350 : 0), nextPathUpdate: 0,
             currentPath: [], rageUntil: 0,
             superRageStart: 0, superRageEnd: 0,
             isDead: false
@@ -1645,9 +1656,9 @@ function update(timestamp) {
                     if (ob !== b) {
                         const oddx = ob.x - player.trungRasenganX, oddy = ob.y - player.trungRasenganY;
                         const od = Math.sqrt(oddx * oddx + oddy * oddy) || 1;
-                        ob.x = Math.max(1, Math.min(COLS - 2, ob.x + (oddx / od) * 4));
-                        ob.y = Math.max(1, Math.min(ROWS - 2, ob.y + (oddy / od) * 4));
-                        ob.trungRasenganSlowOtherUntil = now + 3000;
+                        ob.x = Math.max(1, Math.min(COLS - 2, ob.x + (oddx / od) * 6));
+                        ob.y = Math.max(1, Math.min(ROWS - 2, ob.y + (oddy / od) * 6));
+                        ob.trungRasenganSlowOtherUntil = now + 5000;
                     }
                 });
                 shakeAmount = 25;
@@ -1678,7 +1689,7 @@ function update(timestamp) {
     // BOT MOVE
     let bSpdBase = (isHard ? 0.09 : 0.065) + (currentLevel * (isHard ? 0.0125 : 0.01));
     if (selectedBot === 'tin') bSpdBase *= (isHard ? 2.0 : 1.75);
-    if (selectedBot === 'luom') bSpdBase = (isLuomCanMove ? (isHard ? 1.25 : 1.1) : 0);
+    if (selectedBot === 'luom') bSpdBase = (isLuomCanMove ? (isHard ? 1.225 : 1.15) : 0);
     if ((selectedBot === 'quyen' || selectedBot === 'anh') && isHard) bSpdBase *= 1.5;
 
     bots.forEach(b => {
@@ -1703,9 +1714,14 @@ function update(timestamp) {
         if (b.trungRasenganSlowOtherUntil && now < b.trungRasenganSlowOtherUntil) finalBSpd *= 0.5;
         if (isLuomCanMove){
             spawnTrail(b.x, b.y, '#ef4444');
-        };
+            if (!isLuomMoveAudio) {
+                audio.play("sfx", "luom-move");
+                isLuomMoveAudio = true;
+            }
+        } else isLuomMoveAudio = false;
         traps.forEach((t, idx) => {
             if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
+                b.isDelayed = true;
                 b.delayUntil = now + (isHard ? 3000 : 3500);
                 spawnShockwave(t.x, t.y, '#fff');
                 traps.splice(idx, 1);
@@ -1717,10 +1733,11 @@ function update(timestamp) {
         });
 
         if (now > freezeEnd && now > (b.delayUntil || 0)) {
+            b.isDelayed = false;
             let target = (decoys.length > 0) ? decoys[0] : player;
             if (now > b.nextPathUpdate || b.currentPath.length === 0) {
                 b.currentPath = getPath(b.x, b.y, target.x, target.y);
-                b.nextPathUpdate = now + (isCommonRage ? 350 : 500);
+                b.nextPathUpdate = now + (isCommonRage ? 300 : 400);
             }
             if (b.currentPath && b.currentPath.length > 1) {
                 let next = b.currentPath[1];
@@ -1741,6 +1758,7 @@ function update(timestamp) {
                 b.isDead = true;
             } else if (player.isShield && now < player.shieldEnd) {
                 player.isShield = false;
+                b.isDelayed = true;
                 b.delayUntil = now + (isHard ? 2500 : 3500);
                 spawnShockwave(player.x, player.y, '#fbbf24');
             } else if (player.isQuangGravity && now < player.quangGravityEnd) {
@@ -1752,9 +1770,10 @@ function update(timestamp) {
                 player.isParrying = false;
                 player.invincibleEnd = now + 3000;
                 player.isParrySuccess = true;
+                b.isDelayed = true;
                 b.delayUntil = now + 4500;
                 // explosion effect + sfx
-                playSfx(200, 'sine', 0.2);
+                if (!MUTE_SFX) playSfx(200, 'sine', 0.2);
                 spawnShockwave(player.x, player.y, '#ff0000');
                 spawnShockwave(player.x, player.y, '#ffa653');
                 spawnShockwave(player.x, player.y, '#ffffff');
@@ -1783,8 +1802,9 @@ function update(timestamp) {
                     parry.style.transition = 'none';
                 }, 600);
                 audio.play("sfx", "dang-parrysucess");
-            } else if (freezeEnd < now && !player.isInvincible && !player.isTanGod && !player.isGhost && !player.isQuangJumping) {
+            } else if (freezeEnd < now && !b.isDelayed && !player.isInvincible && !player.isTanGod && !player.isGhost && !player.isQuangJumping) {
                 audio.stopChannel("sfx");
+                audio.stopChannel("music");
                 audio.play("sfx", "kill");
                 endGame(false, selectedBot);
             }
@@ -1794,7 +1814,7 @@ function update(timestamp) {
     bots = bots.filter(b => !b.isDead);
     if (lpbots > bots.length){
         player.countKills = lpbots - bots.length
-        const kmult = (selectedChar === 'quang' ? 0.03 : 0.25) * player.countKills;
+        const kmult = (selectedChar === 'quang' ? 0.035 : 0.25) * player.countKills;
         yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * kmult);
         uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * kmult);
         iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * kmult);
@@ -1817,7 +1837,7 @@ function update(timestamp) {
                     spawnShockwave(bh.x, bh.y, i % 3 === 0 ? '#000' : (i % 3 === 1 ? '#4c1d95' : '#c084fc'));
                 }, i * 50);
             }
-            playSfx(30, 'sawtooth', 1.0, 0.5, 15);
+            if (!MUTE_SFX) playSfx(30, 'sawtooth', 1.0, 0.5, 15);
         }
     });
     blackholes = blackholes.filter(bh => now < bh.lifeEnd && !bh.exploded);
@@ -1937,6 +1957,7 @@ function update(timestamp) {
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
             audio.stopChannel("sfx");
+            audio.stopChannel("music");
             audio.play("sfx", "win");
             endGame(true, selectedBot);
         }
@@ -2001,7 +2022,7 @@ function update(timestamp) {
     var thisFrameTime = (thisLoop = new Date) - lastLoop;
     frameTime += (thisFrameTime - frameTime) / filterStrength;
     lastLoop = thisLoop;
-    if (debugmode) {
+    if (DEBUG_MODE) {
         const debug = document.getElementById('debug');
         debug.classList.remove('hidden');
         debug.innerText = `X: ${player.x.toFixed(3)} ; Y: ${player.y.toFixed(3)}`
@@ -2270,7 +2291,7 @@ function draw(inRage) {
         const now = Date.now();
         const superEnraged = (now > b.superRageStart && now < b.superRageEnd) || (selectedBot === 'luom' && ((now - startTime) % 20000 < (gameMode === 'hard' ? 5000 : 3000)) && (now - startTime > 20000));
         let bCol = (selectedBot === 'anh' ? '#f59e0b' : (selectedBot === 'quyen' ? '#ec4899' : (selectedBot === 'tin' ? '#3b82f6' : '#ef4444')));
-        if (now < freezeEnd || now < b.delayUntil) bCol = '#fff';
+        if (now < freezeEnd || b.isDelayed) bCol = '#fff';
         drawEntity(b.x, b.y, bCol, '#000', true, inRage, superEnraged);
     });
 
@@ -2293,7 +2314,7 @@ function updateUI(now) {
 
 function endGame(win, bot) {
     gameActive = false;
-    document.getElementById('game-over').classList.remove('hidden');
+    document.getElementById('game-over').classList.remove('hidden')
     if (win) {
         document.getElementById('end-title').innerText = "BẠN THẮNG!";
         document.getElementById('end-title').style.color = "#22c55e";
@@ -2333,6 +2354,7 @@ function resetGameState() {
     shakeAmount = 0;
     showRoad = false;
     alarmSoundPlaying = false;
+    isLuomMoveAudio = false;
     player = {
         x: 1.5, y: 1.5,
         isMoving: false, isCoffee: false, isGhost: false, isShield: false, isUlt: false,
@@ -2369,6 +2391,7 @@ function resetGameState() {
 }
 
 function returnToSelection() {
+    audio.play("music", "mainmenu");
     resetGameState();
     document.getElementById('game-over').classList.add('hidden');
     document.getElementById('selection-screen').classList.remove('hidden');
@@ -2376,7 +2399,15 @@ function returnToSelection() {
     setPauseOverlay(false);
 }
 
+// Click to Start handler
+function handleClickToStart() {
+    document.getElementById('click-to-start').classList.add('hidden');
+    document.getElementById('selection-screen').classList.remove('hidden');
+    audio.play("music", "mainmenu");
+}
+
 function returnToGame() {
+    audio.play("music", "gametheme");
     resetGameState();
     document.getElementById('game-over').classList.add('hidden');
     document.getElementById('selection-screen').classList.add('hidden');
@@ -2387,7 +2418,7 @@ function returnToGame() {
     gameActive = true;
     startTime = Date.now();
     update();
-    playSfx(300, 'sine', 0.5, 0.1, 600);
+    if (!MUTE_SFX) playSfx(300, 'sine', 0.5, 0.1, 600);
 }
 
 window.selectChar = (c) => {
@@ -2459,6 +2490,8 @@ window.selectBot = (b) => {
 };
 
 document.getElementById('start-btn').onclick = () => {
+    audio.stop("music", "mainmenu");
+    audio.play("music", "gametheme");
     resetGameState();
     document.getElementById('selection-screen').classList.add('hidden');
     document.getElementById('game-ui').classList.remove('hidden');
@@ -2467,7 +2500,7 @@ document.getElementById('start-btn').onclick = () => {
     gameActive = true;
     startTime = Date.now();
     update();
-    playSfx(300, 'sine', 0.5, 0.1, 600);
+    if (!MUTE_SFX) playSfx(300, 'sine', 0.5, 0.1, 600);
 };
 
 window.addEventListener('keydown', e => {
@@ -2499,6 +2532,9 @@ selectChar('khang');
 selectMode('normal');
 selectBot('quyen');
 
+// Hide selection screen initially, show click-to-start instead
+document.getElementById('selection-screen').classList.add('hidden');
+
 // Load settings from file on startup
 loadSettings();
 
@@ -2517,8 +2553,10 @@ function closeSettings() {
 function loadSettingsToUI() {
     // Load current values to UI
     document.getElementById('setting-fps').value = TARGET_FPS;
-    document.getElementById('setting-debug').innerText = debugmode ? 'ON' : 'OFF';
-    document.getElementById('setting-shadow').innerText = ENABLE_SHADOW_EFFECTS ? 'ON' : 'OFF';
+    document.getElementById('setting-debug-toggle').checked = DEBUG_MODE;
+    document.getElementById('setting-themes-toggle').checked = MUTE_THEMES;
+    document.getElementById('setting-sfx-toggle').checked = MUTE_SFX;
+    document.getElementById('setting-shadow-toggle').checked = ENABLE_SHADOW_EFFECTS;
     document.getElementById('setting-shockwaves').value = MAX_SHOCKWAVES;
     document.getElementById('setting-trails').value = MAX_TRAILS;
 }
@@ -2529,18 +2567,32 @@ function toggleDebug() {
 }
 
 function toggleShadow() {
-    const btn = document.getElementById('setting-shadow');
-    btn.innerText = btn.innerText === 'ON' ? 'OFF' : 'ON';
+    const toggle = document.getElementById('setting-shadow-toggle');
+    toggle.checked = !toggle.checked;
+}
+
+function toggleThemes() {
+    const toggle = document.getElementById('setting-themes-toggle');
+    toggle.checked = !toggle.checked;
+}
+
+function toggleSFX() {
+    const toggle = document.getElementById('setting-sfx-toggle');
+    toggle.checked = !toggle.checked;
 }
 
 function saveSettings() {
     const settings = {
         game: {
             targetFPS: parseInt(document.getElementById('setting-fps').value),
-            debugMode: document.getElementById('setting-debug').innerText === 'ON'
+            debugMode: document.getElementById('setting-debug-toggle').checked
+        },
+        audio: {
+            muteThemes: document.getElementById('setting-themes-toggle').checked,
+            muteSFX: document.getElementById('setting-sfx-toggle').checked
         },
         visual: {
-            enableShadowEffects: document.getElementById('setting-shadow').innerText === 'ON',
+            enableShadowEffects: document.getElementById('setting-shadow-toggle').checked,
             maxShockwaves: parseInt(document.getElementById('setting-shockwaves').value),
             maxTrails: parseInt(document.getElementById('setting-trails').value),
             maxParticles: 50
@@ -2566,8 +2618,15 @@ function applySettings(settings) {
     if (settings.game) {
         TARGET_FPS = settings.game.targetFPS || 60;
         TARGET_FRAME_TIME = 1000 / TARGET_FPS;
-        // Update global variable for debugmode
-        window.debugmode = settings.game.debugMode !== undefined ? settings.game.debugMode : true;
+        // Update global variable for DEBUG_MODE
+        DEBUG_MODE = settings.game.debugMode ?? true;
+    }
+    // Apply audio settings
+    if (settings.audio) {
+        MUTE_THEMES = settings.audio.muteThemes ?? false;
+        MUTE_SFX = settings.audio.muteSFX ?? false;
+        audio.setChannelVolume("sfx", !MUTE_SFX);
+        audio.setChannelVolume("music", !MUTE_THEMES);
     }
     
     // Apply visual settings
@@ -2611,8 +2670,12 @@ function resetSettings() {
             targetFPS: 60,
             debugMode: true
         },
+        audio: {
+            muteThemes: false,
+            muteSFX: false
+        },
         visual: {
-            enableShadowEffects: false,
+            enableShadowEffects: true,
             maxShockwaves: 25,
             maxTrails: 20,
             maxParticles: 50
