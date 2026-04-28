@@ -526,6 +526,11 @@ audio.preload([
     // Others audio
     {
         channel: "sfx",
+        name: "click",
+        src: "assets/sfx/click.mp3"
+    },
+    {
+        channel: "sfx",
         name: "kill",
         src: "assets/sfx/kill.mp3"
     },
@@ -569,7 +574,6 @@ audio.preload([
         config: { volume: 0.67, loop: true }
     }
 ]);
-
 // Cảnh báo phẫn nộ
 function playAlarm() {
     if (alarmSoundPlaying) return;
@@ -2554,26 +2558,6 @@ function loadSettingsToUI() {
     document.getElementById('setting-trails').value = MAX_TRAILS;
 }
 
-function toggleDebug() {
-    const btn = document.getElementById('setting-debug');
-    btn.innerText = btn.innerText === 'ON' ? 'OFF' : 'ON';
-}
-
-function toggleShadow() {
-    const toggle = document.getElementById('setting-shadow-toggle');
-    toggle.checked = !toggle.checked;
-}
-
-function toggleThemes() {
-    const toggle = document.getElementById('setting-themes-toggle');
-    toggle.checked = !toggle.checked;
-}
-
-function toggleSFX() {
-    const toggle = document.getElementById('setting-sfx-toggle');
-    toggle.checked = !toggle.checked;
-}
-
 function saveSettings() {
     const settings = {
         game: {
@@ -2611,7 +2595,6 @@ function applySettings(settings) {
     if (settings.game) {
         TARGET_FPS = settings.game.targetFPS || 60;
         TARGET_FRAME_TIME = 1000 / TARGET_FPS;
-        // Update global variable for DEBUG_MODE
         DEBUG_MODE = settings.game.debugMode ?? true;
     }
     // Apply audio settings
@@ -2624,7 +2607,7 @@ function applySettings(settings) {
     
     // Apply visual settings
     if (settings.visual) {
-        ENABLE_SHADOW_EFFECTS = settings.visual.enableShadowEffects !== undefined ? settings.visual.enableShadowEffects : false;
+        ENABLE_SHADOW_EFFECTS = settings.visual.enableShadowEffects ?? false;
         MAX_SHOCKWAVES = settings.visual.maxShockwaves || 25;
         MAX_TRAILS = settings.visual.maxTrails || 20;
     }
