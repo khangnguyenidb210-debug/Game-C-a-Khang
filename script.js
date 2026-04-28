@@ -13,10 +13,10 @@ let maze = [];
 
 let player = {
     x: 1.5, y: 1.5,
-    isMoving: false, isCoffee: false, isGhost: false, isShield: false, isUlt: false,
-    ultEnd: 0, roadEnd: 0, shieldEnd: 0, ghostEnd: 0, coffeeEnd: 0,
+    isMoving: false, isCoffee: false, isGhost: false, isUlt: false,
+    ultEnd: 0, roadEnd: 0, ghostEnd: 0, coffeeEnd: 0,
     khangDashCount: 0, khangTraps: 5,
-    isMedalSpeed: false, medalSpeedEnd: 0,
+    isLoiSpeed: false, LoiSpeedEnd: 0,
     isDelayed: false, delayEnd: 0,
     isParrying: false, parryEnd: 0,
     isInvincible: false, invincibleEnd: 0,
@@ -70,13 +70,13 @@ var lastUpdateTime = 0, deltaTime = 0;
 let mazeCache = null, mazeCacheRage = null; // Cache for rendered maze
 
 const COOLDOWNS = {
-    khang: { y: 4000, u: 12000, i: 3000, o: 18000 },
+    khang: { y: 5000, u: 12000, i: 3000, o: 18000 },
     dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
-    loi: { y: 6000, u: 12000, i: 6000, o: 18000 },
+    loi: { y: 12000, u: 8000, i: 10000, o: 20000 },
     tan:  { y: 12000, u: 15000, i: 18000, o: 30000 },
     thoai: { y: 7000, u: 7000, i: 12000, o: 30000 },
     quang: { y: 12000, u: 20000, i: 12000, o: 30000 },
-    trung: { y: 15000, u: 14000, i: 8000, o: 18000 }
+    trung: { y: 15000, u: 12000, i: 8000, o: 18000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -97,10 +97,9 @@ function shiftTimers(delta) {
     lastBotSpawnTime += delta;
     player.ultEnd += delta;
     player.roadEnd += delta;
-    player.shieldEnd += delta;
     player.ghostEnd += delta;
     player.coffeeEnd += delta;
-    player.medalSpeedEnd += delta;
+    player.LoiSpeedEnd += delta;
     player.fastEnd += delta;
     player.slowEnd += delta;
     player.superSlowEnd += delta;
@@ -341,7 +340,7 @@ audio.preload([
         channel: "sfx",
         name: "luom-move",
         src: "assets/luom/move.mp3",
-        config: { volume: 0.6 }
+        config: { volume: 0.7 }
     },
     // Khang's audio
     {
@@ -406,6 +405,11 @@ audio.preload([
     // Loi's audio
     {
         channel: "sfx",
+        name: "loi-speed",
+        src: "assets/loi/speed.mp3"
+    },
+    {
+        channel: "sfx",
         name: "loi-stagger",
         src: "assets/loi/stagger.mp3"
     },
@@ -443,20 +447,18 @@ audio.preload([
         channel: "sfx",
         name: "thoai-ragebaitsucess",
         src: "assets/thoai/ragebait-sucess.mp3",
-        config: { volume: 0.6 }
+        config: { volume: 0.67 }
     },
     // Quang's audio
     {
         channel: "sfx",
         name: "quang-burps",
-        src: "assets/quang/burps.mp3",
-        config: { volume: 0.8 }
+        src: "assets/quang/burps.mp3"
     },
     {
         channel: "sfx",
         name: "quang-landing",
-        src: "assets/quang/landing.mp3",
-        config: { volume: 0.9 }
+        src: "assets/quang/landing.mp3"
     },
     {
         channel: "sfx",
@@ -470,9 +472,9 @@ audio.preload([
     },
     {
         channel: "sfx",
-        name: "quang-wee",
-        src: "assets/quang/wee.mp3",
-        config: { volume: 0.5 }
+        name: "quang-jump",
+        src: "assets/quang/jump.mp3",
+        config: { volume: 0.85 }
     },
     // Tan's audio
     {
@@ -552,13 +554,19 @@ audio.preload([
         channel: "music",
         name: "mainmenu",
         src: "assets/themes/main-menu.mp3",
-        config: { volume: 0.6, loop: true }
+        config: { volume: 0.67, loop: true }
+    },
+    {
+        channel: "music",
+        name: "settingtheme",
+        src: "assets/themes/setting-theme.mp3",
+        config: { loop: true }
     },
     {
         channel: "music",
         name: "gametheme",
         src: "assets/themes/game-theme.mp3",
-        config: { volume: 0.6, loop: true }
+        config: { volume: 0.67, loop: true }
     }
 ]);
 
@@ -877,22 +885,24 @@ function useY() {
     if (now < yCD || player.isDelayed || player.isTrungTired) return;
     if (selectedChar === 'khang') {
         const isUlt = player.isUlt;
+        let isDashSucess = false;
         let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
         if (!dx && !dy) dy = -1;
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 15; i++) {
             let nx = player.x + dx * 0.4, ny = player.y + dy * 0.4;
             if (!checkCollision(nx, ny)) {
                 spawnTrail(player.x, player.y, isUlt ? 'rgba(255,255,255,0.6)' : 'rgba(34,197,94,0.3)');
                 player.x = nx;
                 player.y = ny;
+                isDashSucess = true;
             } else break;
         }
         if (isUlt) {
             player.khangDashCount++;
             if (player.khangDashCount < 2) yCD = now + 400;
             else { player.khangDashCount = 0; yCD = now + 1500 * (selectedBot === 'anh' ? 1.5 : 1); }
-        } else yCD = now + COOLDOWNS.khang.y * (selectedBot === 'anh' ? 1.5 : 1);
-        audio.play("sfx", `khang-dash${Math.random() < 0.5 ? 1 : 2}`);
+        } else yCD = now + COOLDOWNS.khang.y * (selectedBot === 'anh' ? 1.5 : 1) * isDashSucess;
+        if (isDashSucess) audio.play("sfx", `khang-dash${Math.random() < 0.5 ? 1 : 2}`);
     } else if (selectedChar === 'dang') {
         player.isCoffee = true;
         player.coffeeEnd = now + 4000;
@@ -1046,27 +1056,19 @@ function useU() {
         } else audio.play("sfx", "dang-missing");
 
     } else if (selectedChar === 'loi') {
-        freezeEnd = now + 3000;
-        player.isShield = true;
-        player.shieldEnd = now + 5000;
-        player.isMedalSpeed = true;
-        player.medalSpeedEnd = now + 2000;
-        bots.forEach(b => {
-            b.superRageStart = now + 3000;
-            b.superRageEnd = now + 6000;
-        });
-        spawnShockwave(player.x, player.y, '#fbbf24');
-        if (!MUTE_SFX) (400, 'square', 0.4);
+        player.isLoiSpeed = true;
+        player.LoiSpeedEnd = now + 2500;
+        audio.play("sfx", "loi-speed");
     } else if (selectedChar === 'tan') {
-        // SHARINGAN: screen red, all bots delayed 10s, then 3x rage for 3s after
+        // SHARINGAN: screen red, all bots delayed 5s, then 3x rage for 3s after
         player.isTanSharingan = true;
         player.tanSharinganEnd = now + 10000;
         shakeAmount = 30;
         bots.forEach(b => {
             b.isDelayed = true;
-            b.delayUntil = now + 10000;
-            b.superRageStart = now + 10000;
-            b.superRageEnd = now + 13000;
+            b.delayUntil = now + 5000;
+            b.superRageStart = now + 5000;
+            b.superRageEnd = now + 10000;
         });
         audio.play("sfx", "tan-sharingan");
         const sharinganImg = document.getElementById('sharingan-flash');
@@ -1399,7 +1401,7 @@ function useO() {
         player.quangJumpEnd = now + 1500;
         player.isInvincible = true;
         player.invincibleEnd = now + 1700;
-        audio.play("sfx", "quang-wee");
+        audio.play("sfx", "quang-jump");
         setTimeout(() => {
             player.isSlow = true;
             player.slowEnd = now + 1200;
@@ -1587,7 +1589,7 @@ function update(timestamp) {
     else {
         if (player.isFast) mult *= 1.15;
         if (player.isCoffee) mult *= 1.25;
-        if (player.isMedalSpeed) mult *= 2.0;
+        if (player.isLoiSpeed) mult *= 3.0;
         if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.6);
         if (player.isSuperSlow && now < player.superSlowEnd) mult *= 0.25;
         if (player.isSlow && now < player.slowEnd) mult *= 0.525;
@@ -1756,11 +1758,6 @@ function update(timestamp) {
                 shakeAmount = 15;
                 audio.play("sfx", "kill");
                 b.isDead = true;
-            } else if (player.isShield && now < player.shieldEnd) {
-                player.isShield = false;
-                b.isDelayed = true;
-                b.delayUntil = now + (isHard ? 2500 : 3500);
-                spawnShockwave(player.x, player.y, '#fbbf24');
             } else if (player.isQuangGravity && now < player.quangGravityEnd) {
                 b.isDead = true;
                 audio.play("sfx", "quang-nom");
@@ -1981,9 +1978,8 @@ function update(timestamp) {
     if (now > player.superSlowEnd) player.isSuperSlow = false;
     if (now > player.ghostEnd) player.isGhost = false;
     if (now > player.coffeeEnd) player.isCoffee = false;
-    if (now > player.shieldEnd) player.isShield = false;
     if (now > player.invincibleEnd) player.isInvincible = false;
-    if (now > player.medalSpeedEnd) player.isMedalSpeed = false;
+    if (now > player.LoiSpeedEnd) player.isLoiSpeed = false;
     if (now > player.ultEnd) {
         if (player.isUlt && selectedChar === 'khang') 
             document.getElementById('trap-counter').classList.add('hidden');
@@ -2041,13 +2037,6 @@ function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false) {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
         if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 20; ctx.shadowColor = '#ffffff'; }
-        ctx.strokeRect(x * TILE_SIZE - size * 0.8, y * TILE_SIZE - size * 0.8, size * 1.6, size * 1.6);
-        ctx.shadowBlur = 0;
-    }
-    if (!isBot && player.isShield && Date.now() < player.shieldEnd) {
-        ctx.strokeStyle = '#fbbf24';
-        ctx.lineWidth = 4;
-        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 20; ctx.shadowColor = '#fbbf24'; }
         ctx.strokeRect(x * TILE_SIZE - size * 0.8, y * TILE_SIZE - size * 0.8, size * 1.6, size * 1.6);
         ctx.shadowBlur = 0;
     }
@@ -2357,10 +2346,10 @@ function resetGameState() {
     isLuomMoveAudio = false;
     player = {
         x: 1.5, y: 1.5,
-        isMoving: false, isCoffee: false, isGhost: false, isShield: false, isUlt: false,
-        ultEnd: 0, roadEnd: 0, shieldEnd: 0, ghostEnd: 0, coffeeEnd: 0,
+        isMoving: false, isCoffee: false, isGhost: false, isUlt: false,
+        ultEnd: 0, roadEnd: 0, ghostEnd: 0, coffeeEnd: 0,
         khangDashCount: 0, khangTraps: 5,
-        isMedalSpeed: false, medalSpeedEnd: 0,
+        isLoiSpeed: false, LoiSpeedEnd: 0,
         isDelayed: false, delayEnd: 0,
         isParrying: false, parryEnd: 0,
         isInvincible: false, invincibleEnd: 0,
@@ -2543,11 +2532,15 @@ loadSettings();
  */
 function openSettings() {
     document.getElementById('settings-modal').classList.remove('hidden');
+    audio.play("music", "settingtheme");
+    audio.stop("music", "mainmenu");
     loadSettingsToUI();
 }
 
 function closeSettings() {
     document.getElementById('settings-modal').classList.add('hidden');
+    audio.stop("music", "settingtheme");
+    audio.play("music", "mainmenu");
 }
 
 function loadSettingsToUI() {
