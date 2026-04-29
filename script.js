@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 11)";
+const version = "1.2 (preview, build 12)";
 
 // GAME CONFIG - Tùy chỉnh tốc độ game (sẽ được load từ settings)
 // Xem thêm trong phần SETTINGS SYSTEM ở cuối file
@@ -14,9 +14,9 @@ let maze = [];
 let player = {
     x: 1.5, y: 1.5,
     isMoving: false, isCoffee: false, isGhost: false, isUlt: false,
-    ultEnd: 0, roadEnd: 0, ghostEnd: 0, coffeeEnd: 0,
+    ultEnd: 0, roadEnd: 0, ghostEnd: 0, dangCoffeeEnd: 0,
     khangDashCount: 0, khangTraps: 5,
-    isLoiSpeed: false, LoiSpeedEnd: 0,
+    isLoiSpeed: false, loiSpeedEnd: 0,
     isDelayed: false, delayEnd: 0,
     isParrying: false, parryEnd: 0,
     isInvincible: false, invincibleEnd: 0,
@@ -43,7 +43,13 @@ let player = {
     isTrungHasagi: false, trungHasagiEnd: 0,       // [U] shockwave push everyone through maze
     isTrungDashing: false, trungDashEnd: 0,        // [I] atomic slice dash
     isTrungRasengan: false, trungRasenganEnd: 0,   // [O] wind ball follows player
-    trungRasenganX: 0, trungRasenganY: 0
+    trungRasenganX: 0, trungRasenganY: 0,
+    // Miss Anh skills - Red Light Green Light
+    isAnhRedLight: false, anhRedLightEnd: 0,      // đèn đỏ đang active
+    isAnhBlinded: false, anhBlindedEnd: 0,        // bị làm mù tầm nhìn
+    anhLightPhase: 0,                             // phase hiện tại của đèn (1-4)
+    anhLightCycle: 0,                             // chu kỳ đèn (mỗi chu kỳ 10s: 9s xanh - 1s đỏ)
+    anhPenaltyStart: 0                            // thời điểm bắt đầu bị phạt
 };
 
 let bots = [], particles = [], decoys = [], trails = [], shockwaves = [], traps = [], blackholes = [];
@@ -52,7 +58,34 @@ let selectedBot = 'quyen', selectedChar = 'khang', gameMode = 'normal';
 let yCD = 0, uCD = 0, iCD = 0, oCD = 0, freezeEnd = 0, lastBotSpawnTime = 0;
 let shakeAmount = 0, showRoad = false;
 let alarmSoundPlaying = false;
+let lastAnhState = null, isStateChanged = false;
+let isAnhBreak = false, isBreakingPlayed = true;
 let isLuomMoveAudio = false, isRaging = false;
+
+// Miss Anh skill assets
+let anhStageImages = [null, null, null, null];
+let anhBreakingImage = null;
+
+// Load Miss Anh skill images
+function loadAnhSkillImages() {
+    const stagePaths = [
+        'assets/anh/state1.webp',
+        'assets/anh/state2.webp',
+        'assets/anh/state3.webp',
+        'assets/anh/state4.webp'
+    ];
+    const breakingPath = 'assets/anh/breaking.webp';
+    
+    stagePaths.forEach((path, index) => {
+        const img = new Image();
+        img.onload = () => { anhStageImages[index] = img; };
+        img.src = path;
+    });
+    
+    const breakingImg = new Image();
+    breakingImg.onload = () => { anhBreakingImage = breakingImg; };
+    breakingImg.src = breakingPath;
+}
 
 // Global variables for settings (can be modified by settings system)
 var TARGET_FPS = 60;
@@ -74,7 +107,7 @@ const COOLDOWNS = {
     dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
     loi: { y: 12000, u: 8000, i: 10000, o: 20000 },
     tan:  { y: 12000, u: 15000, i: 18000, o: 30000 },
-    thoai: { y: 7000, u: 7000, i: 12000, o: 30000 },
+    thoai: { y: 6000, u: 8000, i: 12000, o: 28000 },
     quang: { y: 12000, u: 20000, i: 12000, o: 30000 },
     trung: { y: 15000, u: 12000, i: 8000, o: 18000 }
 };
@@ -98,8 +131,8 @@ function shiftTimers(delta) {
     player.ultEnd += delta;
     player.roadEnd += delta;
     player.ghostEnd += delta;
-    player.coffeeEnd += delta;
-    player.LoiSpeedEnd += delta;
+    player.dangCoffeeEnd += delta;
+    player.loiSpeedEnd += delta;
     player.fastEnd += delta;
     player.slowEnd += delta;
     player.superSlowEnd += delta;
@@ -328,8 +361,32 @@ audio.preload([
     // Anh's audio
     {
         channel: "sfx", 
-        name: "anh-placingwall",
-        src: "assets/anh/placingwall.mp3"
+        name: "anh-tick1",
+        src: "assets/anh/tick1.mp3"
+    },
+    {
+        channel: "sfx", 
+        name: "anh-tick2",
+        src: "assets/anh/tick2.mp3",
+        config: { volume: 0.85 }
+    },
+    {
+        channel: "sfx", 
+        name: "anh-tick3",
+        src: "assets/anh/tick3.mp3",
+        config: { volume: 0.85 }
+    },
+    {
+        channel: "sfx", 
+        name: "anh-tick4",
+        src: "assets/anh/tick4.mp3",
+        config: { volume: 0.85 }
+    },
+    {
+        channel: "sfx", 
+        name: "anh-breaking",
+        src: "assets/anh/breaking.mp3",
+        config: { volume: 0.9 }
     },
     // Luom's audio
     {
@@ -583,19 +640,19 @@ audio.preload([
         channel: "music",
         name: "gametheme1",
         src: "assets/themes/game-theme1.mp3",
-        config: { volume: 0.67, loop: true }
+        config: { volume: 0.7, loop: true }
     },
     {
         channel: "music",
         name: "gametheme2",
         src: "assets/themes/game-theme2.mp3",
-        config: { volume: 0.67, loop: true }
+        config: { volume: 0.85, loop: true }
     },
     {
         channel: "music",
         name: "gametheme3",
         src: "assets/themes/game-theme3.mp3",
-        config: { volume: 0.67, loop: true }
+        config: { volume: 0.95, loop: true }
     }
 ]);
 
@@ -938,7 +995,7 @@ function useY() {
         if (isDashSucess) audio.play("sfx", `khang-dash${Math.random() < 0.5 ? 1 : 2}`);
     } else if (selectedChar === 'dang') {
         player.isCoffee = true;
-        player.coffeeEnd = now + 4000;
+        player.dangCoffeeEnd = now + 4000;
         yCD = now + COOLDOWNS.dang.y * (selectedBot === 'anh' ? 1.5 : 1);
         showRoad = true;
         player.roadEnd = now + 4000;
@@ -1020,8 +1077,6 @@ function useY() {
         }
         audio.play("sfx", "trung-thechildofthewindgod");
         setTimeout(() => {
-            player.isTrungWindGod = false;
-            player.isGhost = false;
             player.isTrungTired = true;
             player.trungTiredEnd = now + 6000; // 5s wind + 1s tired
             spawnShockwave(player.x, player.y, '#94a3b8');
@@ -1090,7 +1145,7 @@ function useU() {
 
     } else if (selectedChar === 'loi') {
         player.isLoiSpeed = true;
-        player.LoiSpeedEnd = now + 2500;
+        player.loiSpeedEnd = now + 2500;
         audio.play("sfx", "loi-speed");
     } else if (selectedChar === 'tan') {
         // SHARINGAN: screen red, all bots delayed 5s, then 3x rage for 3s after
@@ -1235,7 +1290,7 @@ function useI() {
         if (bots.length > 0) {
             shakeAmount = 25;
             bots.forEach(b => {
-                spawnShockwave(b.x, b.y, '#f97316');
+                spawnShockwave(b.x, b.y, '#f94316');
                 spawnShockwave(b.x, b.y, '#facc15');
             });
             audio.play("sfx", "tan-delete");
@@ -1491,25 +1546,63 @@ function update(timestamp) {
         document.getElementById('warning-flash').classList.remove('delay-warning');
     }
 
-    // Miss Anh: place a wall on the shortest path every 10s
-    if (selectedBot === 'anh' && 
-        elapsed > (10000 + (isHard ? 500 : 800) * (currentLevel - 1)) && 
-        (elapsed % (10000 + (isHard ? 500 : 800) * (currentLevel - 1))) < 50 && freezeEnd < now) {
-        let path = getPath(player.x, player.y, COLS - 1.5, ROWS - 1.5);
-        if (path.length > 2) {
-            for (let i = path.length - 2; i > 0; i--) {
-                let [wx, wy] = path[i];
-                if (maze[wy][wx] !== 'k' && maze[wy][wx] !== 'a' && maze[wy][wx] !== 'w' 
-                    && Math.sqrt((wx + 0.5 - player.x) ** 2 + (wy + 0.5 - player.y) ** 2) > 1.5 && Math.sqrt((wx + 0.5 - (COLS - 1.5)) ** 2 + (wy + 0.5 - (ROWS - 1.5)) ** 2) > 1.5) {
-                    maze[wy][wx] = 'a';
-                    setTimeout(() => {
-                        maze[wy][wx] = '.';
-                    }, (isHard ? 7500 : 6000) + (500 * (currentLevel - 1)));
-                    spawnShockwave(wx + 0.5, wy + 0.5, '#ef4444');
-                    audio.play("sfx", "anh-placingwall");
-                    break;
-                }
-            }
+    // Miss Anh: Red Light Green Light skill (6s green - 1s red)
+    if (selectedBot === 'anh') {
+        const lightCycleDuration = 7000; // 7 seconds per cycle
+        const redLightDuration = 1000;     // 1 second red light
+        
+        // Nếu đang bị phạt, tạm dừng chu kỳ đèn cho đến khi hết penalty
+        let effectiveElapsed = elapsed;
+        if (player.isAnhBlinded && now < player.anhBlindedEnd) {
+            // Đặt lại elapsed về thời điểm bắt đầu bị phạt để chu kỳ không tiến triển
+            effectiveElapsed = player.anhPenaltyStart;
+        }
+        
+        const cycleTime = effectiveElapsed % lightCycleDuration;
+        const isRedLight = cycleTime >= (lightCycleDuration - redLightDuration);
+        
+        // Determine which stage (1-4) based on cycle progress
+        let newPhase = Math.floor(cycleTime / 1750) + 1;
+        if (newPhase > 4) newPhase = 4;
+        
+        // Update light phase
+        player.anhLightPhase = newPhase;
+        player.anhLightCycle = Math.floor(effectiveElapsed / lightCycleDuration);
+
+        if (player.anhLightPhase != lastAnhState){
+            lastAnhState = player.anhLightPhase;
+            isStateChanged = true;
+        }
+        
+        // Check if red light just started
+        if (isRedLight && !player.isAnhRedLight)
+            player.isAnhRedLight = true;
+        
+        // Check if green light started (red light ended)
+        if (!isRedLight && player.isAnhRedLight)
+            player.isAnhRedLight = false;
+        
+        // Check if player moved during red light -> penalty
+        // Use keys pressed instead of player.isMoving (which is set after this check)
+        // Không tính penalty nếu đang bị phạt từ trước
+        const isPlayerPressingKeys = keys.w || keys.a || keys.s || keys.d;
+        if (player.isAnhRedLight && isPlayerPressingKeys && !player.isAnhBlinded) {
+            // Player moved during red light - apply blindness and slow
+            player.isAnhBlinded = true;
+            player.anhBlindedEnd = now + 2500; // 2.5 seconds blindness
+            player.anhPenaltyStart = effectiveElapsed; // Lưu thời điểm bắt đầu bị phạt
+            player.isSuperSlow = true;
+            player.superSlowEnd = now + 2500;
+            if (!isAnhBreak) isBreakingPlayed = false;
+            isAnhBreak = true;
+            shakeAmount = 15;
+            spawnShockwave(player.x, player.y, '#ef4444');
+        }
+        
+        // Clear blindness when time is up
+        if (now > player.anhBlindedEnd) {
+            isAnhBreak = false;
+            player.isAnhBlinded = false;
         }
     }
     // Lerm movement
@@ -1533,10 +1626,10 @@ function update(timestamp) {
         playAlarm();
     } else {
         isRaging = false;
-        if (selectedChar !== 'quang' && player.isSuperSlow && now < player.superSlowEnd) {
+        if (selectedChar !== 'quang' && ((player.isSuperSlow && now < player.superSlowEnd) || (player.isSlow && player.slowEnd))) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#c084fc';
-            statusEl.innerText = "🐌 BỊ LÀM CHẬM! (0.25X TỐC ĐỘ)";
+            statusEl.innerText = "🐌 BỊ LÀM CHẬM";
         } else if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) {
             statusEl.classList.remove('opacity-0');
             statusEl.style.color = '#facc15';
@@ -1547,7 +1640,7 @@ function update(timestamp) {
             statusEl.innerText = "👁 SHARINGAN! (BOT BỊ ĐÓNG BĂNG)";
         } else if (selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd) {
             statusEl.classList.remove('opacity-0');
-            statusEl.style.color = '#f97316';
+            statusEl.style.color = '#f94316';
             statusEl.innerText = `🔥 HUNTER MODE!`;
         } else if (selectedChar === 'thoai' && player.isThoaiSlow && now < player.thoaisuperSlowEnd) {
             statusEl.classList.remove('opacity-0');
@@ -1610,6 +1703,8 @@ function update(timestamp) {
     let baseSpd = isHard ? 0.12 : 0.06 + ((isHard ? 0.05 : 0.015) * currentLevel);
     let mult = 1;
     player.isMoving = false;
+    if (player.isSuperSlow) mult *= 0.25;
+    if (player.isSlow) mult *= 0.525;
     if (selectedChar === 'quang') mult *= 0.75;
     if (player.isParrySuccess) {
         player.isFast = true;
@@ -1624,8 +1719,6 @@ function update(timestamp) {
         if (player.isCoffee) mult *= 1.25;
         if (player.isLoiSpeed) mult *= 3.0;
         if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.6);
-        if (player.isSuperSlow && now < player.superSlowEnd) mult *= 0.25;
-        if (player.isSlow && now < player.slowEnd) mult *= 0.525;
         if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) mult *= 2.0;
         if (selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd)
             mult *= (1.0 + player.tanUltKills * 0.25);
@@ -1832,7 +1925,7 @@ function update(timestamp) {
                     parry.style.transition = 'none';
                 }, 600);
                 audio.play("sfx", "dang-parrysucess");
-            } else if (freezeEnd < now && !b.isDelayed && !player.isInvincible && !player.isTanGod && !player.isGhost && !player.isQuangJumping) {
+            } else if ((freezeEnd < now && !b.isDelayed) && !player.isInvincible && !player.isTanGod && !player.isGhost && !player.isQuangJumping) {
                 audio.stopChannel("sfx");
                 audio.stopChannel("music");
                 audio.play("sfx", "kill");
@@ -1980,9 +2073,11 @@ function update(timestamp) {
             if (selectedChar === 'khang' && player.isUlt) {
                 iCD = now;
                 player.khangTraps += 5;
-                player.ultEnd = now + 5000;
+                player.ultEnd = now + 3000;
                 document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: 5`;
             }
+            if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) 
+                player.trungWindGodEnd = now + 4500;
             audio.play("sfx", "new-level");
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
@@ -2010,9 +2105,9 @@ function update(timestamp) {
     if (now > player.slowEnd) player.isSlow = false;
     if (now > player.superSlowEnd) player.isSuperSlow = false;
     if (now > player.ghostEnd) player.isGhost = false;
-    if (now > player.coffeeEnd) player.isCoffee = false;
+    if (now > player.dangCoffeeEnd) player.isCoffee = false;
     if (now > player.invincibleEnd) player.isInvincible = false;
-    if (now > player.LoiSpeedEnd) player.isLoiSpeed = false;
+    if (now > player.loiSpeedEnd) player.isLoiSpeed = false;
     if (now > player.ultEnd) {
         if (player.isUlt && selectedChar === 'khang') 
             document.getElementById('trap-counter').classList.add('hidden');
@@ -2028,7 +2123,10 @@ function update(timestamp) {
     if (now > player.thoaiPenaltyEnd) player.isThoaiPenalty = false;
     if (now > player.quangGravityEnd) player.isQuangGravity = false;
     if (now > player.quangJumpEnd) player.isQuangJumping = false;
-    if (now > player.trungWindGodEnd) { player.isTrungWindGod = false; player.isGhost = false; }
+    if (now > player.trungWindGodEnd) { 
+        player.isTrungWindGod = false; 
+        if (selectedChar === 'trung') player.isGhost = false;
+    }
     if (now > player.trungTiredEnd) player.isTrungTired = false;
     if (now > player.trungRasenganEnd) player.isTrungRasengan = false;
 
@@ -2116,6 +2214,7 @@ function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false) {
 }
 
 function draw(inRage) {
+    const now = Date.now();
     ctx.save();
     if (shakeAmount > 1) ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2159,7 +2258,7 @@ function draw(inRage) {
     });
 
     // Draw black holes (Thoai [O] and Quang [I] mega)
-    const nowDraw = Date.now();
+    const nowDraw = now;
     blackholes.forEach(bh => {
         const cx = bh.x * TILE_SIZE, cy = bh.y * TILE_SIZE;
         const pulse = 0.7 + 0.3 * Math.sin(nowDraw / 120);
@@ -2232,49 +2331,159 @@ function draw(inRage) {
         ctx.stroke();
     });
     ctx.globalAlpha = 1;
+    // PLayer color
+    if (selectedChar === 'khang') pCol = '#22c55e';
+    else if (selectedChar === 'dang') pCol = '#06b6d4';
+    else if (selectedChar === 'loi') pCol = '#6366f1';
+    else if (selectedChar === 'thoai') pCol = '#a78bfa'
+    else if (selectedChar === 'quang') pCol = '#d97706';
+    else if (selectedChar === 'tan') pCol = '#f94316';
+    else if (selectedChar === 'trung') pCol = '#38bdf8';
 
-    let pCol = selectedChar === 'khang' ? '#22c55e' : (selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'loi' ? '#6366f1' : (selectedChar === 'thoai' ? '#a78bfa' : (selectedChar === 'quang' ? '#d97706' : (selectedChar === 'trung' ? '#38bdf8' : '#f97316')))));
-    if (player.isUlt && selectedChar === 'dang') pCol = '#fbbf24';
-    if (player.isDelayed) pCol = '#475569';
-    if (player.isParrying) pCol = '#7ec8d5';
-    if (player.isGhost && selectedChar === 'dang') pCol = 'rgba(6, 182, 212, 0.5)';
-    if (selectedChar === 'tan' && player.isTanGod && Date.now() < player.tanGodEnd) pCol = '#facc15';
-    if (selectedChar === 'tan' && player.isTanHunter && Date.now() < player.tanHunterEnd) pCol = '#ef4444';
-    if (selectedChar === 'thoai' && player.isThoaiHunter && Date.now() < player.thoaiHunterEnd) pCol = '#facc15';
-    if (selectedChar === 'thoai' && player.isThoaiBoosted && Date.now() < player.thoaiBoostedEnd) pCol = '#22c55e';
-    if (selectedChar === 'thoai' && player.isThoaiPenalty && Date.now() < player.thoaiPenaltyEnd) pCol = '#475569';
-    if (selectedChar === 'quang' && player.isQuangGravity && Date.now() < player.quangGravityEnd) pCol = '#c084fc';
-    if (selectedChar === 'quang' && player.isQuangJumping && Date.now() < player.quangJumpEnd) pCol = '#fbbf24';
-    if (selectedChar === 'trung' && player.isTrungWindGod && Date.now() < player.trungWindGodEnd) pCol = '#e0f2fe';
-    if (selectedChar === 'trung' && player.isTrungTired && Date.now() < player.trungTiredEnd) pCol = '#475569';
-    if (selectedChar === 'tan' && player.isTanSharingan && Date.now() < player.tanSharinganEnd) {
+
+    if (selectedChar === 'dang' && player.isUlt && now < player.ultEnd) pCol = '#fbbf24';
+    if (selectedChar === 'dang' && player.isDelayed && now < player.ultEnd) pCol = '#475569';
+    if (selectedChar === 'dang' && player.isParrying && now < player.ultEnd) pCol = '#7ec8d5';
+    if (selectedChar === 'dang' && player.isGhost && now < player.ghostEnd) pCol = 'rgba(6, 182, 212, 0.5)';
+    if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) pCol = '#facc15';
+    if (selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd) pCol = '#ef4444';
+    if (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd) pCol = '#facc15';
+    if (selectedChar === 'thoai' && player.isThoaiBoosted && now < player.thoaiBoostedEnd) pCol = '#22c55e';
+    if (selectedChar === 'thoai' && player.isThoaiPenalty && now < player.thoaiPenaltyEnd) pCol = '#475569';
+    if (selectedChar === 'quang' && player.isQuangGravity && now < player.quangGravityEnd) pCol = '#c084fc';
+    if (selectedChar === 'quang' && player.isQuangJumping && now < player.quangJumpEnd) pCol = '#fbbf24';
+    if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) pCol = '#e0f2fe';
+    if (selectedChar === 'trung' && player.isTrungTired && now < player.trungTiredEnd) pCol = '#475569';
+    if (selectedChar === 'tan' && player.isTanSharingan && now < player.tanSharinganEnd) {
         // Sharingan: tint the whole canvas red
         ctx.save();
         ctx.fillStyle = 'rgba(180, 0, 0, 0.25)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
     }
-    if (selectedChar === 'quang' && player.isQuangGravity && Date.now() < player.quangGravityEnd) {
+    if (selectedChar === 'quang' && player.isQuangGravity && now < player.quangGravityEnd) {
         // Gravity: tint the whole canvas purple
         ctx.save();
         ctx.fillStyle = 'rgba(88, 28, 135, 0.18)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
     }
-    if (selectedChar === 'trung' && player.isTrungWindGod && Date.now() < player.trungWindGodEnd) {
+    if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) {
         // Wind God: tint canvas light blue
         ctx.save();
         ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
     }
-    drawEntity(player.x, player.y, pCol, (player.isGhost || player.isDelayed) ? 'transparent' : '#454545');
+    
+    // Miss Anh: Red Light Green Light skill - draw stage indicator at top center
+    if (selectedBot === 'anh' && gameActive) {
+        const lightCycleDuration = 7000;
+        const redLightDuration = 1000;
+        const elapsedDraw = nowDraw - startTime;
+        
+        // Nếu đang bị phạt, giữ nguyên stage tại thời điểm bị phạt
+        let effectiveElapsedDraw = elapsedDraw;
+        if (player.isAnhBlinded && nowDraw < player.anhBlindedEnd && player.anhPenaltyStart > 0) {
+            effectiveElapsedDraw = player.anhPenaltyStart;
+        }
+        
+        const cycleTime = effectiveElapsedDraw % lightCycleDuration;
+        const isRedLight = cycleTime >= (lightCycleDuration - redLightDuration);
+        
+        // Draw stage indicator at top center
+        const stageX = canvas.width / 2;
+        const stageY = 40;
+        
+        // Determine which stage image to use (0-3 for array index)
+        const phase = Math.floor(cycleTime / 1750) + 1;
+        const stageIndex = phase - 1;
+        
+        ctx.save();
+        
+        // Check if player is blinded - use breaking image
+        if (player.isAnhBlinded && now < player.anhBlindedEnd && anhBreakingImage) {
+            // Draw breaking image at top center
+            const imgWidth = 110;
+            const imgHeight = 85;
+            if (!isBreakingPlayed) {
+                isBreakingPlayed = true;
+                audio.play("sfx", "anh-breaking");
+            }
+            ctx.drawImage(anhBreakingImage, stageX - imgWidth/2, stageY - imgHeight/2, imgWidth, imgHeight);
+        } 
+        // Otherwise draw stage image
+        else if (stageIndex >= 0 && stageIndex < 4 && anhStageImages[stageIndex]) {
+            const imgWidth = 110;
+            const imgHeight = 85;
+            if (isStateChanged) {
+                isStateChanged = false;
+                audio.play("sfx", `anh-tick${stageIndex+1}`);
+            }
+            ctx.drawImage(anhStageImages[stageIndex], stageX - imgWidth/2, stageY - imgHeight/2, imgWidth, imgHeight);
+        } 
+        // Fallback: draw text if images not loaded
+        else {
+            // Draw background for stage indicator
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.beginPath();
+            ctx.roundRect(stageX - 80, stageY - 25, 160, 50, 10);
+            ctx.fill();
+            
+            if (phase >= 1 && phase <= 4) {
+                // Draw stage number
+                ctx.fillStyle = isRedLight ? '#ef4444' : '#22c55e';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`Stage ${phase}`, stageX, stageY);
+                
+                // Draw light indicator
+                ctx.beginPath();
+                ctx.arc(stageX + 55, stageY, 10, 0, Math.PI * 2);
+                ctx.fillStyle = isRedLight ? '#ef4444' : '#22c55e';
+                ctx.fill();
+                
+                // Add glow effect
+                if (isRedLight) {
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#ef4444';
+                    ctx.beginPath();
+                    ctx.arc(stageX + 55, stageY, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
+        ctx.restore();
+        
+        // Draw blindness effect when player is blinded
+        if (player.isAnhBlinded && now < player.anhBlindedEnd) {
+            ctx.save();
+            // Create a vignette effect to simulate blindness
+            const gradient = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, canvas.width * 0.2,
+                canvas.width / 2, canvas.height / 2, canvas.width * 0.6
+            );
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add red tint
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+        }
+    }
+    
+    drawEntity(player.x, player.y, pCol, player.isDelayed ? 'transparent' : '#454545');
 
     // Draw Rasengan wind ball
-    if (selectedChar === 'trung' && player.isTrungRasengan && Date.now() < player.trungRasenganEnd) {
+    if (selectedChar === 'trung' && player.isTrungRasengan && now < player.trungRasenganEnd) {
         const rx = player.trungRasenganX * TILE_SIZE;
         const ry = player.trungRasenganY * TILE_SIZE;
-        const t2 = Date.now();
+        const t2 = now;
         const pulse = 0.7 + 0.3 * Math.sin(t2 / 80);
         const spin = t2 / 120;
         // Outer spinning ring
@@ -2377,12 +2586,16 @@ function resetGameState() {
     showRoad = false;
     alarmSoundPlaying = false;
     isLuomMoveAudio = false;
+    lastAnhState = null;
+    isStateChanged = false;
+    isAnhBreak = false;
+    isBreakingPlayed = true;
     player = {
         x: 1.5, y: 1.5,
         isMoving: false, isCoffee: false, isGhost: false, isUlt: false,
-        ultEnd: 0, roadEnd: 0, ghostEnd: 0, coffeeEnd: 0,
+        ultEnd: 0, roadEnd: 0, ghostEnd: 0, dangCoffeeEnd: 0,
         khangDashCount: 0, khangTraps: 5,
-        isLoiSpeed: false, LoiSpeedEnd: 0,
+        isLoiSpeed: false, loiSpeedEnd: 0,
         isDelayed: false, delayEnd: 0,
         isParrying: false, parryEnd: 0,
         isInvincible: false, invincibleEnd: 0,
@@ -2445,7 +2658,15 @@ function returnToGame() {
 
 window.selectChar = (c) => {
     selectedChar = c;
-    const colors = { khang: '#22c55e', dang: '#06b6d4', loi: '#6366f1', tan: '#f97316', thoai: '#a78bfa', quang: '#d97706', trung: '#38bdf8' };
+    const colors = { 
+        khang: '#22c55e', 
+        dang: '#06b6d4', 
+        loi: '#6366f1', 
+        tan: '#f94316', 
+        thoai: '#a78bfa', 
+        quang: '#d97706', 
+        trung: '#38bdf8' 
+    };
     const charOrder = ['khang', 'dang', 'loi', 'tan', 'thoai', 'quang', 'trung'];
     
     // Update tab buttons
@@ -2495,6 +2716,7 @@ window.changeCharTab = (dir) => {
 // Initialize character display on load
 window.addEventListener('DOMContentLoaded', () => {
     selectChar('khang');
+    loadAnhSkillImages();
 });
 
 window.selectMode = (m) => {
