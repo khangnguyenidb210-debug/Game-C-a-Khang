@@ -630,13 +630,13 @@ audio.preload([
         channel: "music",
         name: "settingtheme2",
         src: "assets/themes/setting-theme2.mp3",
-        config: { volume: 0.5, loop: true }
+        config: { volume: 1, loop: true }
     },
     {
         channel: "music",
         name: "settingtheme3",
         src: "assets/themes/setting-theme3.mp3",
-        config: { volume: 0.5, loop: true }
+        config: { volume: 1, loop: true }
     }
 ]);
 
