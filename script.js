@@ -1748,10 +1748,12 @@ function update(timestamp) {
         // Check if rasengan hits any bot
         bots.forEach(b => {
             const d = Math.sqrt((b.x - player.trungRasenganX) ** 2 + (b.y - player.trungRasenganY) ** 2);
-            if (d < 0.8 && !b.trungRasenganHit) {
+            if (d < 1 && !b.trungRasenganHit) {
                 b.trungRasenganHit = true;
-                // This bot: 0.25x speed for 30s
-                b.trungRasenganSlowUntil = now + 30000;
+                b.isDelayed = true;
+                b.delayUntil = now + 3000;
+                // This bot: 0.25x speed for 15s
+                b.trungRasenganSlowUntil = now + 15000;
                 // Push this bot far
                 const bddx = b.x - player.trungRasenganX, bddy = b.y - player.trungRasenganY;
                 const bd = Math.sqrt(bddx * bddx + bddy * bddy) || 1;
