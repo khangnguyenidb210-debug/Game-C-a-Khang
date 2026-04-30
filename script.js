@@ -328,12 +328,22 @@ const audio = new AudioManager();
 audio.preload([
     // Quyen's audio
     {
+        channel: "music",
+        name: "quyen-chase",
+        src: "assets/quyen/chase.mp3"
+    },
+    {
         channel: "sfx",
         name: "quyen-delaying",
         src: "assets/quyen/delaying.mp3",
         config: { volume: 0.9 }
     },
     // Anh's audio
+    {
+        channel: "music",
+        name: "anh-chase",
+        src: "assets/anh/chase.mp3"
+    },
     {
         channel: "sfx", 
         name: "anh-tick1",
@@ -365,6 +375,11 @@ audio.preload([
     },
     // Luom's audio
     {
+        channel: "music",
+        name: "luom-chase",
+        src: "assets/luom/chase.mp3"
+    },
+    {
         channel: "sfx",
         name: "luom-rage",
         src: "assets/luom/rage.mp3"
@@ -373,7 +388,13 @@ audio.preload([
         channel: "sfx",
         name: "luom-move",
         src: "assets/luom/move.mp3",
-        config: { volume: 0.7 }
+        config: { volume: 0.6 }
+    },
+    // Tin's audio
+    {
+        channel: "music",
+        name: "tin-chase",
+        src: "assets/tin/chase.mp3"
     },
     // Khang's audio
     {
@@ -613,27 +634,9 @@ audio.preload([
     },
     {
         channel: "music",
-        name: "gametheme1",
-        src: "assets/themes/game-theme1.mp3",
-        config: { volume: 0.7, loop: true }
-    },
-    {
-        channel: "music",
-        name: "gametheme2",
-        src: "assets/themes/game-theme2.mp3",
-        config: { volume: 0.85, loop: true }
-    },
-    {
-        channel: "music",
-        name: "gametheme3",
-        src: "assets/themes/game-theme3.mp3",
-        config: { volume: 0.95, loop: true }
-    },
-    {
-        channel: "music",
-        name: "gametheme4",
-        src: "assets/themes/game-theme4.mp3",
-        config: { volume: 0.85, loop: true }
+        name: "settingtheme3",
+        src: "assets/themes/setting-theme3.mp3",
+        config: { volume: 0.5, loop: true }
     }
 ]);
 
@@ -2597,7 +2600,7 @@ function handleClickToStart() {
 }
 
 function returnToGame() {
-    playRandomGameTheme()
+    playChaseTheme()
     resetGameState();
     document.getElementById('game-over').classList.add('hidden');
     document.getElementById('selection-screen').classList.add('hidden');
@@ -2689,7 +2692,7 @@ window.selectBot = (b) => {
 
 document.getElementById('start-btn').onclick = () => {
     audio.stop("music", "mainmenu");
-    playRandomGameTheme()
+    playChaseTheme()
     resetGameState();
     document.getElementById('selection-screen').classList.add('hidden');
     document.getElementById('game-ui').classList.remove('hidden');
@@ -2748,14 +2751,12 @@ loadSettings();
  */
 
 // Random theme players
-function playRandomGameTheme() {
-    const themes = ["gametheme1", "gametheme2", "gametheme3", "gametheme4"];
-    const randomTheme = themes[Math.floor(Math.random() * themes.length)];
-    audio.play("music", randomTheme);
+function playChaseTheme() {
+    audio.play("music", `${selectedBot}-chase`);
 }
 
 function playRandomSettingTheme() {
-    const themes = ["settingtheme1", "settingtheme2"];
+    const themes = ["settingtheme1", "settingtheme2", "settingtheme3"];
     const randomTheme = themes[Math.floor(Math.random() * themes.length)];
     audio.play("music", randomTheme);
 }
