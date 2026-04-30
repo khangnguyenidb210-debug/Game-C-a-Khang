@@ -45,8 +45,8 @@ let player = {
     isTrungRasengan: false, trungRasenganEnd: 0,   // [O] wind ball follows player
     trungRasenganX: 0, trungRasenganY: 0,
     // Miss Anh skills - Red Light Green Light
-    isAnhRedLight: false, anhRedLightEnd: 0,      // đèn đỏ đang active
     isAnhBlinded: false, anhBlindedEnd: 0,        // bị làm mù tầm nhìn
+    isAnhRedLight: false,                         // đèn đỏ đang active
     anhLightPhase: 0,                             // phase hiện tại của đèn (1-4)
     anhLightCycle: 0,                             // chu kỳ đèn (mỗi chu kỳ 10s: 9s xanh - 1s đỏ)
     anhPenaltyStart: 0                            // thời điểm bắt đầu bị phạt
@@ -61,31 +61,6 @@ let alarmSoundPlaying = false;
 let lastAnhState = null, isStateChanged = false;
 let isAnhBreak = false, isBreakingPlayed = true;
 let isLuomMoveAudio = false, isRaging = false;
-
-// Miss Anh skill assets
-let anhStageImages = [null, null, null, null];
-let anhBreakingImage = null;
-
-// Load Miss Anh skill images
-function loadAnhSkillImages() {
-    const stagePaths = [
-        'assets/anh/state1.webp',
-        'assets/anh/state2.webp',
-        'assets/anh/state3.webp',
-        'assets/anh/state4.webp'
-    ];
-    const breakingPath = 'assets/anh/breaking.webp';
-    
-    stagePaths.forEach((path, index) => {
-        const img = new Image();
-        img.onload = () => { anhStageImages[index] = img; };
-        img.src = path;
-    });
-    
-    const breakingImg = new Image();
-    breakingImg.onload = () => { anhBreakingImage = breakingImg; };
-    breakingImg.src = breakingPath;
-}
 
 // Global variables for settings (can be modified by settings system)
 var TARGET_FPS = 60;
@@ -103,9 +78,9 @@ var lastUpdateTime = 0, deltaTime = 0;
 let mazeCache = null, mazeCacheRage = null; // Cache for rendered maze
 
 const COOLDOWNS = {
-    khang: { y: 5000, u: 12000, i: 3000, o: 18000 },
+    khang: { y: 6000, u: 12000, i: 3500, o: 18000 },
     dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
-    loi: { y: 12000, u: 8000, i: 10000, o: 20000 },
+    loi: { y: 15000, u: 7000, i: 10000, o: 25000 },
     tan:  { y: 12000, u: 15000, i: 18000, o: 30000 },
     thoai: { y: 6000, u: 8000, i: 12000, o: 28000 },
     quang: { y: 12000, u: 20000, i: 12000, o: 30000 },
@@ -1549,7 +1524,7 @@ function update(timestamp) {
     // Miss Anh: Red Light Green Light skill (6s green - 1s red)
     if (selectedBot === 'anh') {
         const lightCycleDuration = 7000; // 7 seconds per cycle
-        const redLightDuration = 1000;     // 1 second red light
+        const redLightDuration = 750;     // 0.75 second red light
         
         // Nếu đang bị phạt, tạm dừng chu kỳ đèn cho đến khi hết penalty
         let effectiveElapsed = elapsed;
@@ -1570,6 +1545,8 @@ function update(timestamp) {
         player.anhLightCycle = Math.floor(effectiveElapsed / lightCycleDuration);
 
         if (player.anhLightPhase != lastAnhState){
+            if (lastAnhState != null)
+                document.getElementById(`anh-stage${lastAnhState}`).classList.add('hidden');
             lastAnhState = player.anhLightPhase;
             isStateChanged = true;
         }
@@ -1585,8 +1562,7 @@ function update(timestamp) {
         // Check if player moved during red light -> penalty
         // Use keys pressed instead of player.isMoving (which is set after this check)
         // Không tính penalty nếu đang bị phạt từ trước
-        const isPlayerPressingKeys = keys.w || keys.a || keys.s || keys.d;
-        if (player.isAnhRedLight && isPlayerPressingKeys && !player.isAnhBlinded) {
+        if (player.isAnhRedLight && player.isMoving && !player.isAnhBlinded) {
             // Player moved during red light - apply blindness and slow
             player.isAnhBlinded = true;
             player.anhBlindedEnd = now + 2500; // 2.5 seconds blindness
@@ -1601,6 +1577,8 @@ function update(timestamp) {
         
         // Clear blindness when time is up
         if (now > player.anhBlindedEnd) {
+            document.getElementById(`anh-breaking`).classList.add('hidden');
+            document.getElementById('anh-normal').classList.remove('hidden');
             isAnhBreak = false;
             player.isAnhBlinded = false;
         }
@@ -1829,6 +1807,7 @@ function update(timestamp) {
         let finalBSpd = bSpdBase * timeScale;
         if (superEnraged) finalBSpd *= (selectedBot === 'luom' ? 4.0 : 3.0);
         else if (isCommonRage) finalBSpd *= 2.0;
+        if (player.isAnhBlinded) finalBSpd *= 2.0;
         if (b.isSlow) finalBSpd *= 0.35;
         // Thoai [Y]: slow bots
         if (selectedChar === 'thoai' && b.thoaiSlowUntil && now < b.thoaiSlowUntil) finalBSpd *= 0.25;
@@ -1865,7 +1844,7 @@ function update(timestamp) {
             let target = (decoys.length > 0) ? decoys[0] : player;
             if (now > b.nextPathUpdate || b.currentPath.length === 0) {
                 b.currentPath = getPath(b.x, b.y, target.x, target.y);
-                b.nextPathUpdate = now + (isCommonRage ? 300 : 400);
+                b.nextPathUpdate = now + (isCommonRage ? 100 : 150);
             }
             if (b.currentPath && b.currentPath.length > 1) {
                 let next = b.currentPath[1];
@@ -2379,7 +2358,7 @@ function draw(inRage) {
     // Miss Anh: Red Light Green Light skill - draw stage indicator at top center
     if (selectedBot === 'anh' && gameActive) {
         const lightCycleDuration = 7000;
-        const redLightDuration = 1000;
+        const redLightDuration = 750;
         const elapsedDraw = nowDraw - startTime;
         
         // Nếu đang bị phạt, giữ nguyên stage tại thời điểm bị phạt
@@ -2402,59 +2381,27 @@ function draw(inRage) {
         ctx.save();
         
         // Check if player is blinded - use breaking image
-        if (player.isAnhBlinded && now < player.anhBlindedEnd && anhBreakingImage) {
+        if (player.isAnhBlinded && now < player.anhBlindedEnd) {
             // Draw breaking image at top center
             const imgWidth = 110;
             const imgHeight = 85;
             if (!isBreakingPlayed) {
                 isBreakingPlayed = true;
                 audio.play("sfx", "anh-breaking");
+                document.getElementById(`anh-normal`).classList.add('hidden');
+                document.getElementById(`anh-breaking`).classList.remove('hidden');
             }
-            ctx.drawImage(anhBreakingImage, stageX - imgWidth/2, stageY - imgHeight/2, imgWidth, imgHeight);
         } 
         // Otherwise draw stage image
-        else if (stageIndex >= 0 && stageIndex < 4 && anhStageImages[stageIndex]) {
+        else if (stageIndex >= 0 && stageIndex < 4) {
             const imgWidth = 110;
             const imgHeight = 85;
             if (isStateChanged) {
                 isStateChanged = false;
                 audio.play("sfx", `anh-tick${stageIndex+1}`);
+                document.getElementById(`anh-stage${stageIndex+1}`).classList.remove('hidden');
             }
-            ctx.drawImage(anhStageImages[stageIndex], stageX - imgWidth/2, stageY - imgHeight/2, imgWidth, imgHeight);
         } 
-        // Fallback: draw text if images not loaded
-        else {
-            // Draw background for stage indicator
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.beginPath();
-            ctx.roundRect(stageX - 80, stageY - 25, 160, 50, 10);
-            ctx.fill();
-            
-            if (phase >= 1 && phase <= 4) {
-                // Draw stage number
-                ctx.fillStyle = isRedLight ? '#ef4444' : '#22c55e';
-                ctx.font = 'bold 24px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(`Stage ${phase}`, stageX, stageY);
-                
-                // Draw light indicator
-                ctx.beginPath();
-                ctx.arc(stageX + 55, stageY, 10, 0, Math.PI * 2);
-                ctx.fillStyle = isRedLight ? '#ef4444' : '#22c55e';
-                ctx.fill();
-                
-                // Add glow effect
-                if (isRedLight) {
-                    ctx.shadowBlur = 20;
-                    ctx.shadowColor = '#ef4444';
-                    ctx.beginPath();
-                    ctx.arc(stageX + 55, stageY, 10, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                }
-            }
-        }
         ctx.restore();
         
         // Draw blindness effect when player is blinded
@@ -2466,7 +2413,7 @@ function draw(inRage) {
                 canvas.width / 2, canvas.height / 2, canvas.width * 0.6
             );
             gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
@@ -2545,7 +2492,7 @@ function updateUI(now) {
 
 function endGame(win, bot) {
     gameActive = false;
-    document.getElementById('game-over').classList.remove('hidden')
+    document.getElementById('game-over').classList.remove('hidden');
     if (win) {
         document.getElementById('end-title').innerText = "BẠN THẮNG!";
         document.getElementById('end-title').style.color = "#22c55e";
@@ -2618,8 +2565,16 @@ function resetGameState() {
         isTrungHasagi: false, trungHasagiEnd: 0,
         isTrungDashing: false, trungDashEnd: 0,
         isTrungRasengan: false, trungRasenganEnd: 0,
-        trungRasenganX: 0, trungRasenganY: 0
+        trungRasenganX: 0, trungRasenganY: 0,
+        isAnhBlinded: false, anhBlindedEnd: 0,
+        isAnhRedLight: false,
+        anhLightPhase: 0,
+        anhLightCycle: 0,
+        anhPenaltyStart: 0
     };
+    for (let i = 1; i < 5; i++)
+        document.getElementById(`anh-stage${i}`).classList.add('hidden');
+    document.getElementById('anh-breaking').classList.add('hidden');
     document.getElementById('warning-flash').classList.remove('delay-warning');
     document.getElementById('warning-flash').classList.remove('slow-warning');
     document.getElementById('warning-flash').classList.remove('sharingan-warning', 'god-mode-warning', 'hunter-warning');
@@ -2716,7 +2671,6 @@ window.changeCharTab = (dir) => {
 // Initialize character display on load
 window.addEventListener('DOMContentLoaded', () => {
     selectChar('khang');
-    loadAnhSkillImages();
 });
 
 window.selectMode = (m) => {

@@ -260,6 +260,29 @@
 
     <!-- GAME UI -->
     <div id="game-ui" class="hidden absolute inset-0 pointer-events-none z-[100] flex flex-col justify-between p-10">
+        <!-- Anh Eye Stages -->
+        <div id="anh-stages" class="absolute top-2 left-1/2 -translate-x-1/2">
+            <div id="anh-normal">
+                <div id="anh-stage1" class="hidden">
+                    <img src="assets/anh/state1.webp" alt="AnhState1" class="w-20 h-16">
+                </div>
+                <div id="anh-stage2" class="hidden">
+                    <img src="assets/anh/state2.webp" alt="AnhState2" class="w-20 h-16">
+                </div>
+                <div id="anh-stage3" class="hidden">
+                    <img src="assets/anh/state3.webp" alt="AnhState3" class="w-20 h-16">
+                </div>
+                <div id="anh-stage4" class="hidden">
+                    <img src="assets/anh/state4.webp" alt="AnhState4" class="w-20 h-16">
+                    <img src="assets/anh/ban.png" alt="Ban" class="absolute w-7 h-7 right-10">
+                    <img src="assets/anh/walk.png" alt="Walk" class="absolute w-7 h-7 left-11">
+                </div>
+            </div>
+            <div id="anh-breaking" class="hidden">
+                <img src="assets/anh/breaking.webp" alt="AnhBreaking" class="w-20 h-16">
+            </div>
+        </div>
+
         <div class="flex justify-between items-start">
             <div class="bg-black/50 backdrop-blur-md p-4 rounded-xl border border-white/10">
                 <div id="ui-level-text" class="text-green-500 text-[10px] font-bold tracking-[0.3em] uppercase mb-1">LEVEL 1</div>
