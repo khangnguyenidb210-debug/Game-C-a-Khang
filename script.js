@@ -83,7 +83,7 @@ const COOLDOWNS = {
     loi: { y: 15000, u: 7000, i: 10000, o: 25000 },
     tan:  { y: 12000, u: 15000, i: 18000, o: 30000 },
     thoai: { y: 6000, u: 8000, i: 12000, o: 28000 },
-    quang: { y: 12000, u: 20000, i: 12000, o: 30000 },
+    quang: { y: 10000, u: 16000, i: 10000, o: 28000 },
     trung: { y: 15000, u: 12000, i: 8000, o: 18000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
@@ -628,6 +628,12 @@ audio.preload([
         name: "gametheme3",
         src: "assets/themes/game-theme3.mp3",
         config: { volume: 0.95, loop: true }
+    },
+    {
+        channel: "music",
+        name: "gametheme4",
+        src: "assets/themes/game-theme4.mp3",
+        config: { volume: 0.85, loop: true }
     }
 ]);
 
@@ -1869,7 +1875,7 @@ function update(timestamp) {
                 b.isDead = true;
                 audio.play("sfx", "quang-nom");
             } else if (player.isParrying && now < player.parryEnd) {
-                freezeEnd = now + 2500;
+                freezeEnd = now + 3000;
                 player.isInvincible = true;
                 player.isParrying = false;
                 player.invincibleEnd = now + 3000;
@@ -1882,17 +1888,9 @@ function update(timestamp) {
                 spawnShockwave(player.x, player.y, '#ffa653');
                 spawnShockwave(player.x, player.y, '#ffffff');
                 // rage after stunned
-                if (selectedBot !== 'anh') {
-                    b.superEnraged = true;
-                    b.superRageStart = now + 3500;
-                    b.superRageEnd = now + 7000;
-                    if (selectedBot === 'tin') 
-                        audio.play("sfx", "rage1");
-                    else if (selectedBot === 'luom')
-                        audio.play("sfx", "luom-rage");
-                    else
-                        audio.play("sfx", "rage2");
-                }
+                b.superEnraged = true;
+                b.superRageStart = now + 3000;
+                b.superRageEnd = now + 7000;
                 // show parry picture + ease-out + sfx in assets
                 const parry = document.getElementById('parry-flash');
                 parry.classList.remove('hidden');
@@ -1969,6 +1967,16 @@ function update(timestamp) {
         if (Math.floor(player.x) > COLS - 2) player.x = COLS - 2;
         if (Math.floor(player.y) > ROWS - 2) player.y = ROWS - 2;
         const px = Math.floor(player.x), py = Math.floor(player.y);
+        bots.forEach(b => {
+            const bx = Math.floor(b.x), by = Math.floor(b.y);
+            if (Math.abs(bx - px) <= 1.25 && Math.abs(by - py) <= 1.25) {
+                b.isDead = true;
+                spawnShockwave(b.x, b.y, '#d97706');
+                spawnShockwave(b.x, b.y, '#fbbf24');
+                shakeAmount = 20;
+                audio.play("sfx", "kill");
+            }
+        });
         for (let dy = -1; dy <= 1; dy++) {
             for (let dx2 = -1; dx2 <= 1; dx2++) {
                 const tx = px + dx2, ty = py + dy;
@@ -1997,16 +2005,6 @@ function update(timestamp) {
                 }
             }
         }
-        bots.forEach(b => {
-            const bx = Math.floor(b.x), by = Math.floor(b.y);
-            if (Math.abs(bx - px) <= 1.25 && Math.abs(by - py) <= 1.25) {
-                b.isDead = true;
-                spawnShockwave(b.x, b.y, '#d97706');
-                spawnShockwave(b.x, b.y, '#fbbf24');
-                shakeAmount = 20;
-                audio.play("sfx", "kill");
-            }
-        });
         // Force redraw ngay lập tức
         createMazeCache();
         createMazeCacheRage();
@@ -2751,7 +2749,7 @@ loadSettings();
 
 // Random theme players
 function playRandomGameTheme() {
-    const themes = ["gametheme1", "gametheme2", "gametheme3"];
+    const themes = ["gametheme1", "gametheme2", "gametheme3", "gametheme4"];
     const randomTheme = themes[Math.floor(Math.random() * themes.length)];
     audio.play("music", randomTheme);
 }
@@ -2814,8 +2812,6 @@ function saveSettings() {
     
     // Apply settings immediately
     applySettings(settings);
-    
-    closeSettings();
 }
 
 function applySettings(settings) {

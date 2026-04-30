@@ -47,7 +47,7 @@
         <!-- MODE SELECT -->
         <div class="flex gap-4 mb-8">
             <button id="mode-normal" onclick="selectMode('normal')" class="mode-btn px-6 py-2 rounded-xl border-2 border-slate-700 bg-slate-900/50 text-slate-400 font-bold selected-box uppercase hover:border-blue-400">Thường</button>
-            <button id="mode-hard" onclick="selectMode('hard')" class="mode-btn px-6 py-2 rounded-xl border-2 border-slate-700 bg-slate-900/50 text-slate-400 font-bold uppercase hover:border-red-400">HardCore (Cực Khó)</button>
+            <button id="mode-hard" onclick="selectMode('hard')" class="mode-btn px-6 py-2 rounded-xl border-2 border-slate-700 bg-slate-900/50 text-slate-400 font-bold uppercase hover:border-red-400">HardCore</button>
         </div>
 
         <!-- BOT SELECT -->
@@ -59,7 +59,7 @@
             </div>
             <div id="bot-anh" onclick="selectBot('anh')" class="bot-btn p-4 rounded-xl border-2 border-slate-800 cursor-pointer hover:border-yellow-500 selected-box">
                 <h3 class="font-black text-yellow-500 text-lm uppercase">Miss Anh</h3>
-                <p class="text-[10px] text-slate-400 mt-1 uppercase">Kỹ năng: Red Light - Green Light & x1.5 cooldowns (không thể rage)</p>
+                <p class="text-[10px] text-slate-400 mt-1 uppercase">Kỹ năng: Red Light - Green Light & x1.5 cooldowns</p>
             </div>
             <div id="bot-tin" onclick="selectBot('tin')" class="bot-btn p-4 rounded-xl border-2 border-slate-800 cursor-pointer hover:border-blue-400">
                 <h3 class="font-black text-blue-400 text-lm uppercase">Mr Ting</h3>
@@ -362,7 +362,7 @@
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
                         <label class="text-slate-300">Target FPS</label>
-                        <select id="setting-fps" class="bg-slate-800 border border-slate-600 text-white px-3 py-2 rounded-lg">
+                        <select id="setting-fps" class="bg-slate-800 border border-slate-600 text-white px-3 py-2 rounded-lg" onclick="saveSettings()">
                             <option value="60" selected>60 FPS</option>
                             <option value="120">120 FPS</option>
                             <option value="144">144 FPS</option>
@@ -371,7 +371,7 @@
                     </div>
                     <div class="flex justify-between items-center">
                         <label class="text-slate-300">Debug Mode</label>
-                        <label class="switch">
+                        <label class="switch" onclick="saveSettings()">
                             <input class="toggle" type="checkbox" id="setting-debug-toggle" />
                             <span class="slider"></span>
                             <span class="card-side"></span>
@@ -385,7 +385,7 @@
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
                         <label class="text-slate-300">Mute Themes</label>
-                        <label class="switch">
+                        <label class="switch" onclick="saveSettings()">
                             <input class="toggle" type="checkbox" id="setting-themes-toggle" />
                             <span class="slider"></span>
                             <span class="card-side"></span>
@@ -393,7 +393,7 @@
                     </div>
                     <div class="flex justify-between items-center">
                         <label class="text-slate-300">Mute SFX</label>
-                        <label class="switch">
+                        <label class="switch" onclick="saveSettings()">
                             <input class="toggle" type="checkbox" id="setting-sfx-toggle" />
                             <span class="slider"></span>
                             <span class="card-side"></span>
@@ -407,17 +407,17 @@
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
                         <label class="text-slate-300">Shadow Effects</label>
-                        <label class="switch">
+                        <label class="switch" onclick="saveSettings()">
                             <input class="toggle" type="checkbox" id="setting-shadow-toggle" />
                             <span class="slider"></span>
                             <span class="card-side"></span>
                         </label>
                     </div>
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center" onclick="saveSettings()">
                         <label class="text-slate-300">Max Shockwaves</label>
                         <input id="setting-shockwaves" type="number" min="5" max="50" value="25" class="bg-slate-800 border border-slate-600 text-white px-3 py-2 rounded-lg w-20">
                     </div>
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center" onclick="saveSettings()">
                         <label class="text-slate-300">Max Trails</label>
                         <input id="setting-trails" type="number" min="5" max="50" value="20" class="bg-slate-800 border border-slate-600 text-white px-3 py-2 rounded-lg w-20">
                     </div>
@@ -426,8 +426,8 @@
 
             <!-- Save Button -->
             <div class="flex gap-4">
-                <button onclick="saveSettings()" class="flex-1 bg-green-600 text-white px-6 py-3 rounded-xl font-bold uppercase hover:bg-green-500 transition-all">Lưu</button>
-                <button onclick="resetSettings()" class="px-6 py-3 rounded-xl border border-slate-600 text-slate-400 font-bold uppercase hover:border-white hover:text-white transition-all">Mặc định</button>
+                <button onclick="closeSettings()" class="flex-1 bg-green-600 text-white px-6 py-3 rounded-xl font-bold uppercase hover:bg-green-500 transition-all">Xong</button>
+                <button onclick="resetSettings()" class="flex-1 px-6 py-3 rounded-xl border border-slate-600 text-slate-400 font-bold uppercase hover:border-white hover:text-white transition-all">Mặc định</button>
             </div>
         </div>
     </div>
