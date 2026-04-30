@@ -4,7 +4,7 @@
 Tựa game ban đầu được viết với C++ của Khang và được chuyển thành code HTML + CSS + JavaScript, cùng với sự hỗ trợ code từ Lợi và ý tưởng nền móng code ban đầu đã tạo ra tựa game "ESCAPE FROM THE TECHNOLOGY TEACHER".
 
 # **Lưu ý**
-Game được thiết kế cho PC/Laptop, không phù hợp với điện thoại và các thiết bị khác tương tự!
+Game được thiết kế cho PC/Laptop, không phù hợp với điện thoại và các thiết bị khác!
 
 Game chỉ mang tính chất giải trí và không có mục đích xúc phạm cá nhân hay tổ chức nào khác, xin cảm ơn.
 
@@ -25,3 +25,4 @@ Trốn thoát khỏi mê cung trước khi giáo viên bắt được bạn, dù
 ![gameplay1](https://github.com/khangnguyenidb210-debug/Game-C-a-Khang/blob/test/assets/previews/gameplay1.png)
 ![gameplay2](https://github.com/khangnguyenidb210-debug/Game-C-a-Khang/blob/test/assets/previews/gameplay2.png)
 ![gameplay3](https://github.com/khangnguyenidb210-debug/Game-C-a-Khang/blob/test/assets/previews/gameplay3.png)
+![gameplay4](https://github.com/khangnguyenidb210-debug/Game-C-a-Khang/blob/test/assets/previews/gameplay4.png)

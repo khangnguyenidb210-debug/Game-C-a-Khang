@@ -1801,7 +1801,7 @@ function update(timestamp) {
     if ((selectedBot === 'quyen' || selectedBot === 'anh') && isHard) bSpdBase *= 1.5;
 
     bots.forEach(b => {
-        if (b.x <= 0 || b.x > COLS - 1 || b.y <= 0 || b.y > ROWS - 1) {
+        if (b.x < 0 || b.x > COLS - 1 || b.y < 0 || b.y > ROWS - 1) {
             b.isDead = true;
             return;
         }
@@ -1857,7 +1857,7 @@ function update(timestamp) {
             }
         }
         // collision with player
-        if (Math.sqrt((player.x - b.x) ** 2 + (player.y - b.y) ** 2) < 0.5) {
+        if (Math.sqrt((player.x - b.x) ** 2 + (player.y - b.y) ** 2) < 0.6) {
             if ((selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd) ||
                 (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd)) {
                 spawnShockwave(b.x, b.y, '#facc15');
@@ -1875,7 +1875,7 @@ function update(timestamp) {
                 player.invincibleEnd = now + 3000;
                 player.isParrySuccess = true;
                 b.isDelayed = true;
-                b.delayUntil = now + 4500;
+                b.delayUntil = now + 5000;
                 // explosion effect + sfx
                 if (!MUTE_SFX) playSfx(200, 'sine', 0.2);
                 spawnShockwave(player.x, player.y, '#ff0000');
