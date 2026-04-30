@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2 (preview, build 12)";
+const version = "1.2";
 
 // GAME CONFIG - Tùy chỉnh tốc độ game (sẽ được load từ settings)
 // Xem thêm trong phần SETTINGS SYSTEM ở cuối file
@@ -66,7 +66,7 @@ let isLuomMoveAudio = false, isRaging = false;
 var TARGET_FPS = 60;
 var TARGET_FRAME_TIME = 1000 / TARGET_FPS;
 var ENABLE_SHADOW_EFFECTS = false;
-var DEBUG_MODE = true;
+var DEBUG_MODE = false;
 var MAX_SHOCKWAVES = 25;
 var MAX_TRAILS = 20;
 var MAX_PARTICLES = 50;
@@ -2869,7 +2869,7 @@ function resetSettings() {
     const defaultSettings = {
         game: {
             targetFPS: 60,
-            debugMode: true
+            debugMode: false
         },
         audio: {
             muteThemes: false,
