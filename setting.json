@@ -1,7 +1,7 @@
 {
     "game": {
-        "targetFPS": 144,
-        "debugMode": true
+        "targetFPS": 60,
+        "debugMode": false
     },
     "audio": {
         "muteThemes": false,
