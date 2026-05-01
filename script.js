@@ -1465,7 +1465,7 @@ function useO() {
     } else if (selectedChar === 'loi') {
         // BOUNCE BOMB: throw a bouncing object that kills bots on collision for 10s
         const angle = Math.random() * Math.PI * 2;
-        const speed = 0.25 + 0.065 * (currentLevel);
+        const speed = 0.25 + 0.05 * (currentLevel);
         bounceObjects.push({
             x: player.x,
             y: player.y,
@@ -1487,10 +1487,10 @@ function useO() {
                 bots.forEach(b => {
                     const dx = box - b.x, dy = boy - b.y;
                     const d = Math.sqrt(dx * dx + dy * dy);
-                    if (d < 5) {
+                    if (d < 7.5) {
                         b.isDead = true;
                         audio.play("sfx", "kill");
-                    } else if (d < 8) {
+                    } else if (d < 15) {
                         b.isSlow = true;
                         b.slowEnd = now + 3000;
                     }
@@ -2171,6 +2171,7 @@ function update(timestamp) {
             if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) 
                 player.trungWindGodEnd = now + 4500;
             clearTimeout(objID);
+            audio.stop("sfx", "loi-whattheboom");
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
             audio.stopChannel("sfx");
