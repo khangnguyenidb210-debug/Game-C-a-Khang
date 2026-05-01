@@ -629,11 +629,6 @@ audio.preload([
     },
     {
         channel: "sfx",
-        name: "newlevel",
-        src: "assets/sfx/new-level.mp3"
-    },
-    {
-        channel: "sfx",
         name: "rage1",
         src: "assets/sfx/rahhh.mp3"
     },
@@ -1484,6 +1479,24 @@ function useO() {
         audio.play("sfx", "loi-stagger");
         objID = setTimeout(() => {
             audio.play("sfx", "loi-whattheboom");
+            setTimeout(() => {
+                const box = bounceObjects[0].x,
+                      boy = bounceObjects[0].y;
+                spawnShockwave(box, boy, '#6366f1');
+                spawnShockwave(box, boy, '#000');
+                bots.forEach(b => {
+                    const dx = box - b.x, dy = boy - b.y;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+                    if (d < 5) {
+                        b.isDead = true;
+                        audio.play("sfx", "kill");
+                    } else if (d < 8) {
+                        b.isSlow = true;
+                        b.slowEnd = now + 3000;
+                    }
+                });
+                bots = bots.filter(b => !b.isDead);
+            }, 2000);
         }, 8000);
     } else if (selectedChar === 'tan') {
         // HUNTER ULT: become hunter — touching bots destroys them, +0.25x speed per kill, lasts 30s
@@ -1869,7 +1882,7 @@ function update(timestamp) {
         // Thoai [Y]: slow bots
         if (selectedChar === 'thoai' && b.thoaiSlowUntil && now < b.thoaiSlowUntil) finalBSpd *= 0.25;
         // Quang [Y] earthquake slow (0.25x for 2s after 3s delay)
-        if (b.quangEarthquakeSlowUntil && now < b.quangEarthquakeSlowUntil && now >= (b.delayUntil || 0)) finalBSpd *= 0.25;
+        if (now < b.quangEarthquakeSlowUntil && now >= (b.delayUntil || 0)) finalBSpd *= 0.25;
         // Quang [U] gravity frozen (bots can't move)
         if (b.quangGravityUntil && now < b.quangGravityUntil) finalBSpd = 0;
         if (now >= b.slowEnd) b.isSlow = false;
@@ -1884,7 +1897,7 @@ function update(timestamp) {
             }
         } else isLuomMoveAudio = false;
         traps.forEach((t, idx) => {
-            if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.6) {
+            if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.7) {
                 b.isDelayed = true;
                 b.delayUntil = now + (isHard ? 3000 : 3500);
                 spawnShockwave(t.x, t.y, '#fff');
@@ -1896,7 +1909,7 @@ function update(timestamp) {
             }
         });
         decoys.forEach((d, idx) => {
-            if (Math.sqrt((b.x - d.x) ** 2 + (b.y - d.y) ** 2) < 0.6)
+            if (Math.sqrt((b.x - d.x) ** 2 + (b.y - d.y) ** 2) < 0.7)
                 d.lifeEnd = d.lifeEnd - (isCommonRage ? 25 : 22.5);
         });
         decoys = decoys.filter(d => now < d.lifeEnd);
@@ -1981,7 +1994,7 @@ function update(timestamp) {
         player.totalKills += player.countKills;
         player.countKills = 0;
     }
-    // BLACK HOLE update (Thoai [O] and Quang [I])
+    // BLACK HOLE update (Thoai [O])
     // Handle mega black hole explosion before filter
     blackholes.forEach(bh => {
         if (!bh.exploded && now >= bh.lifeEnd) {
