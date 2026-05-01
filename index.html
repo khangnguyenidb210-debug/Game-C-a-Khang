@@ -56,7 +56,7 @@
             </div>
             <div id="bot-anh" onclick="selectBot('anh')" class="bot-btn p-4 rounded-xl border-2 border-slate-800 cursor-pointer hover:border-yellow-500 selected-box">
                 <h3 class="font-black text-yellow-500 text-lm uppercase">Miss Anh</h3>
-                <p class="text-[10px] text-slate-400 mt-1 uppercase">Kỹ năng: Red Light - Green Light & x1.5 cooldowns</p>
+                <p class="text-[10px] text-slate-400 mt-1 uppercase">Kỹ năng: Red Light - Green Light & x1.25 cooldowns</p>
             </div>
             <div id="bot-tin" onclick="selectBot('tin')" class="bot-btn p-4 rounded-xl border-2 border-slate-800 cursor-pointer hover:border-blue-400">
                 <h3 class="font-black text-blue-400 text-lm uppercase">Mr Ting</h3>
@@ -137,7 +137,7 @@
                     </div>
                     <div class="text-left">
                         <p class="skill-text"><b class="text-white">[Y] Dash:</b> Lướt về phía trước. (x2 khi Ult)</p>
-                        <p class="skill-text"><b class="text-white">[U] Freeze:</b> Dừng thời gian.</p>
+                        <p class="skill-text"><b class="text-white">[U] Freeze:</b> Dừng mọi bot tại chỗ.</p>
                         <p class="skill-text"><b class="text-white">[I] Trap:</b> Đặt 1 bẫy tại chỗ.</p>
                         <p class="skill-text"><b class="text-yellow-500">[O] Ninja:</b> x3 Speed & +5 Bẫy.</p>
                     </div>
@@ -172,10 +172,10 @@
                         </div>
                     </div>
                     <div class="text-left">
-                        <p class="skill-text"><b class="text-white">[Y] Blink:</b> Dịch chuyển về phía trước.</p>
-                        <p class="skill-text"><b class="text-white">[U] Speed:</b> Tăng tốc nhanh trong 2s.</p>
-                        <p class="skill-text"><b class="text-white">[I] Decoy:</b> Tạo mồi nhử tại chỗ.</p>
-                        <p class="skill-text"><b class="text-yellow-500">[O] Bang:</b> Đẩy lùi bot toàn map.</p>
+                        <p class="skill-text"><b class="text-white">[Y] Blink():</b> Dịch chuyển về phía trước.</p>
+                        <p class="skill-text"><b class="text-white">[U] Speed():</b> Tăng tốc nhanh trong 3s.</p>
+                        <p class="skill-text"><b class="text-white">[I] Decoy():</b> Tạo mồi nhử tại chỗ, thu hút bot.</p>
+                        <p class="skill-text"><b class="text-yellow-500">[O] Object():</b> Tạo 1 vật thể bounce và tiêu diệt bot va chạm.</p>
                     </div>
                 </div>
             </div>
@@ -253,6 +253,10 @@
             </div>
         </div>
         <button id="start-btn" class="mb-20 px-20 py-5 bg-white text-black font-black rounded-full text-xl hover:scale-105 transition-all shadow-[0_0_50px_rgba(255,255,255,0.2)] uppercase">Bắt đầu chạy trốn</button>
+        <!-- Discord -->
+        <a class="absolute bottom-2 left-2" onclick="window.location.href='https://discord.gg/DPKvcqSKvs'">
+            <img src="assets/logos/discord.svg" alt="Discord" width="30" height="30" />
+        </a>
     </div>
 
     <!-- GAME UI -->
@@ -350,7 +354,7 @@
         <div class="bg-slate-900 border border-slate-600 rounded-2xl p-8 max-w-lg w-full">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-black uppercase text-green-400">⚙️ Cài đặt</h2>
-                <button onclick="closeSettings()" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+                <button onclick="closeSettings()" class="text-slate-400 hover:text-white text-4xl">&times;</button>
             </div>
             
             <!-- Game Settings -->

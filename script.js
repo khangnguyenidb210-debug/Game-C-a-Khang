@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2";
+const version = "1.2.1";
 
 // GAME CONFIG - Tùy chỉnh tốc độ game (sẽ được load từ settings)
 // Xem thêm trong phần SETTINGS SYSTEM ở cuối file
@@ -52,11 +52,11 @@ let player = {
     anhPenaltyStart: 0                            // thời điểm bắt đầu bị phạt
 };
 
-let bots = [], particles = [], decoys = [], trails = [], shockwaves = [], traps = [], blackholes = [];
+let bots = [], particles = [], decoys = [], trails = [], shockwaves = [], traps = [], blackholes = [], bounceObjects = [];
 let gameActive = false, gamePaused = false, pauseStart = 0, startTime = 0, currentLevel = 1;
 let selectedBot = 'quyen', selectedChar = 'khang', gameMode = 'normal';
 let yCD = 0, uCD = 0, iCD = 0, oCD = 0, freezeEnd = 0, lastBotSpawnTime = 0;
-let shakeAmount = 0, showRoad = false;
+let shakeAmount = 0, showRoad = false, objID = null;
 let alarmSoundPlaying = false;
 let lastAnhState = null, isStateChanged = false;
 let isAnhBreak = false, isBreakingPlayed = true;
@@ -78,12 +78,12 @@ var lastUpdateTime = 0, deltaTime = 0;
 let mazeCache = null, mazeCacheRage = null; // Cache for rendered maze
 
 const COOLDOWNS = {
-    khang: { y: 6000, u: 12000, i: 3500, o: 18000 },
+    khang: { y: 6000, u: 15000, i: 4000, o: 20000 },
     dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
-    loi: { y: 15000, u: 7000, i: 10000, o: 25000 },
+    loi: { y: 12500, u: 8000, i: 8000, o: 20000 },
     tan:  { y: 12000, u: 15000, i: 18000, o: 30000 },
     thoai: { y: 6000, u: 8000, i: 12000, o: 28000 },
-    quang: { y: 10000, u: 16000, i: 10000, o: 28000 },
+    quang: { y: 12000, u: 18000, i: 8000, o: 25000 },
     trung: { y: 15000, u: 12000, i: 8000, o: 18000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
@@ -130,6 +130,7 @@ function shiftTimers(delta) {
     traps.forEach(t => t.life += delta);
     blackholes.forEach(b => b.lifeEnd += delta);
     decoys.forEach(d => d.lifeEnd += delta);
+    bounceObjects.forEach(b => b.lifeEnd += delta);
     bots.forEach(b => {
         b.nextPathUpdate += delta;
         b.delayUntil += delta;
@@ -330,19 +331,32 @@ audio.preload([
     {
         channel: "music",
         name: "quyen-chase",
-        src: "assets/quyen/chase.mp3"
+        src: "assets/quyen/chase.mp3",
+        config: { loop: true }
     },
     {
         channel: "sfx",
-        name: "quyen-delaying",
-        src: "assets/quyen/delaying.mp3",
-        config: { volume: 0.9 }
+        name: "quyen-error1",
+        src: "assets/quyen/error1.mp3",
+        config: { volume: 0.6 }
+    },
+    {
+        channel: "sfx",
+        name: "quyen-error2",
+        src: "assets/quyen/error2.mp3"
+    },
+    {
+        channel: "sfx",
+        name: "quyen-error3",
+        src: "assets/quyen/error3.mp3",
+        config: { volume: 0.7 }
     },
     // Anh's audio
     {
         channel: "music",
         name: "anh-chase",
-        src: "assets/anh/chase.mp3"
+        src: "assets/anh/chase.mp3",
+        config: { loop: true }
     },
     {
         channel: "sfx", 
@@ -377,24 +391,27 @@ audio.preload([
     {
         channel: "music",
         name: "luom-chase",
-        src: "assets/luom/chase.mp3"
+        src: "assets/luom/chase.mp3",
+        config: { volume: 0.85, loop: true }
     },
     {
         channel: "sfx",
         name: "luom-rage",
-        src: "assets/luom/rage.mp3"
+        src: "assets/luom/rage.mp3",
+        config: { volume: 0.7 }
     },
     {
         channel: "sfx",
         name: "luom-move",
         src: "assets/luom/move.mp3",
-        config: { volume: 0.6 }
+        config: { volume: 0.7 }
     },
     // Tin's audio
     {
         channel: "music",
         name: "tin-chase",
-        src: "assets/tin/chase.mp3"
+        src: "assets/tin/chase.mp3",
+        config: { volume: 0.7, loop: true }
     },
     // Khang's audio
     {
@@ -471,7 +488,24 @@ audio.preload([
         channel: "sfx",
         name: "loi-teleport",
         src: "assets/loi/teleport.mp3",
-        config: { volume: 0.7 }
+        config: { volume: 0.8 }
+    },
+    {
+        channel: "sfx",
+        name: "loi-explode",
+        src: "assets/loi/explode.mp3",
+        config: { volume: 0.8 }
+    },{
+        channel: "sfx",
+        name: "loi-pickup",
+        src: "assets/loi/pick-up.mp3",
+        config: { volume: 0.8 }
+    },
+    {
+        channel: "sfx",
+        name: "loi-whattheboom",
+        src: "assets/loi/what-the-boom.mp3",
+        config: { volume: 0.8 }
     },
     // Thoai's audio
     {
@@ -608,11 +642,6 @@ audio.preload([
         name: "rage2",
         src: "assets/sfx/waapp-angry.mp3"
     },
-    {
-        channel: "sfx",
-        name: "win",
-        src: "assets/sfx/win.mp3"
-    },
     // Themes
     {
         channel: "music",
@@ -630,13 +659,25 @@ audio.preload([
         channel: "music",
         name: "settingtheme2",
         src: "assets/themes/setting-theme2.mp3",
-        config: { volume: 1, loop: true }
+        config: { loop: true }
     },
     {
         channel: "music",
         name: "settingtheme3",
         src: "assets/themes/setting-theme3.mp3",
-        config: { volume: 1, loop: true }
+        config: { loop: true }
+    },
+    {
+        channel: "music",
+        name: "wintheme",
+        src: "assets/themes/win-theme.mp3",
+        config: { loop: true }
+    },
+    {
+        channel: "music",
+        name: "deaththeme",
+        src: "assets/themes/death-theme.mp3",
+        config: { loop: true }
     }
 ]);
 
@@ -974,28 +1015,34 @@ function useY() {
         if (isUlt) {
             player.khangDashCount++;
             if (player.khangDashCount < 2) yCD = now + 400;
-            else { player.khangDashCount = 0; yCD = now + 1500 * (selectedBot === 'anh' ? 1.5 : 1); }
-        } else yCD = now + COOLDOWNS.khang.y * (selectedBot === 'anh' ? 1.5 : 1) * isDashSucess;
+            else { player.khangDashCount = 0; yCD = now + 1500 * (selectedBot === 'anh' ? 1.25 : 1); }
+        } else yCD = now + COOLDOWNS.khang.y * (selectedBot === 'anh' ? 1.25 : 1) * isDashSucess;
         if (isDashSucess) audio.play("sfx", `khang-dash${Math.random() < 0.5 ? 1 : 2}`);
     } else if (selectedChar === 'dang') {
         player.isCoffee = true;
         player.dangCoffeeEnd = now + 4000;
-        yCD = now + COOLDOWNS.dang.y * (selectedBot === 'anh' ? 1.5 : 1);
+        yCD = now + COOLDOWNS.dang.y * (selectedBot === 'anh' ? 1.25 : 1);
         showRoad = true;
         player.roadEnd = now + 4000;
         audio.play("sfx", "dang-findpath");
     } else if (selectedChar === 'loi') {
-                let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
+        let dx = keys.a ? -1 : (keys.d ? 1 : 0), dy = keys.w ? -1 : (keys.s ? 1 : 0);
         if (!dx && !dy) dy = -1;
         const blinkDist = 3.5;
-        spawnShockwave(player.x, player.y, 'rgba(99,102,241,0.5)');
+        let isTeleportSucess = false;
+        spawnShockwave(player.x, player.y, '#6366f1');
         for (let d = blinkDist; d >= 0; d -= 0.5) {
             let tx = player.x + dx * d, ty = player.y + dy * d;
-            if (!checkCollision(tx, ty)) { player.x = tx; player.y = ty; break; }
+            if (!checkCollision(tx, ty)) { 
+                spawnTrail(player.x, player.y, '#6366f1');
+                player.x = tx; player.y = ty;
+                isTeleportSucess = true;
+                break; 
+            }
         }
         spawnShockwave(player.x, player.y, '#6366f1');
-        yCD = now + COOLDOWNS.loi.y * (selectedBot === 'anh' ? 1.5 : 1);
-        audio.play("sfx", "loi-teleport");
+        yCD = now + COOLDOWNS.loi.y * (selectedBot === 'anh' ? 1.25 : 1) * isTeleportSucess;
+        if (isTeleportSucess) audio.play("sfx", "loi-teleport");
     } else if (selectedChar === 'tan') {
         // GOD MODE: 2x speed + immortal for 5s
         player.isTanGod = true;
@@ -1009,7 +1056,7 @@ function useY() {
                 spawnShockwave(player.x, player.y, i % 2 ? '#facc15' : '#fff');
             }, i * 80);
         }
-        yCD = now + COOLDOWNS.tan.y * (selectedBot === 'anh' ? 1.5 : 1);
+        yCD = now + COOLDOWNS.tan.y * (selectedBot === 'anh' ? 1.25 : 1);
     } else if (selectedChar === 'thoai') {
         // MÌ TÔM BÒ KHÔ RADIO: slow all bots to 0.25x for 3s
         player.isThoaiSlow = true;
@@ -1032,7 +1079,7 @@ function useY() {
             mitombokho.style.transition = 'none';
         }, 600);
         audio.play("sfx", "thoai-mitombokhoradio");
-        yCD = now + COOLDOWNS.thoai.y * (selectedBot === 'anh' ? 1.5 : 1);
+        yCD = now + COOLDOWNS.thoai.y * (selectedBot === 'anh' ? 1.25 : 1);
     } else if (selectedChar === 'quang') {
         // EARTHQUAKE: shake camera, delay bots 3s, then 0.25x speed for 2s
         shakeAmount = 35;
@@ -1048,7 +1095,7 @@ function useY() {
             b.delayUntil = now + 4500;
             b.quangEarthquakeSlowUntil = now + 4500;
         });
-        yCD = now + COOLDOWNS.quang.y * (selectedBot === 'anh' ? 1.5 : 1);
+        yCD = now + COOLDOWNS.quang.y * (selectedBot === 'anh' ? 1.25 : 1);
     } else if (selectedChar === 'trung') {
         // CON CỦA THẦN GIÓ: 2x speed + ghost through bots 5s, then tired 0.5x for 1s
         player.isTrungWindGod = true;
@@ -1066,7 +1113,7 @@ function useY() {
             spawnShockwave(player.x, player.y, '#94a3b8');
             if (!MUTE_SFX) playSfx(200, 'sine', 0.3, 0.2, 100);
         }, 5000);
-        yCD = now + COOLDOWNS.trung.y * (selectedBot === 'anh' ? 1.5 : 1);
+        yCD = now + COOLDOWNS.trung.y * (selectedBot === 'anh' ? 1.25 : 1);
     }
 }
 
@@ -1129,7 +1176,7 @@ function useU() {
 
     } else if (selectedChar === 'loi') {
         player.isLoiSpeed = true;
-        player.loiSpeedEnd = now + 2500;
+        player.loiSpeedEnd = now + 3000;
         audio.play("sfx", "loi-speed");
     } else if (selectedChar === 'tan') {
         // SHARINGAN: screen red, all bots delayed 5s, then 3x rage for 3s after
@@ -1230,7 +1277,7 @@ function useU() {
             }
         });
     }
-    uCD = now + COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.5 : 1);
+    uCD = now + COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.25 : 1);
 }
 
 function useI() {
@@ -1247,7 +1294,7 @@ function useI() {
             player.khangTraps--;
             document.getElementById('trap-counter').innerText = `BẪY CÒN LẠI: ${player.khangTraps}`;
             if (!MUTE_SFX) playSfx(900, 'sine', 0.1);
-        } else iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1)
+        } else iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.25 : 1)
         return;
     }
     if (now < iCD) return;
@@ -1267,7 +1314,11 @@ function useI() {
         audio.play("sfx", "dang-parrying");
         spawnShockwave(player.x, player.y, '#cecece');
     } else if (selectedChar === 'loi') {
-        decoys.push({ x: player.x, y: player.y, lifeEnd: now + 8000 });
+        decoys.push({ 
+            x: player.x, 
+            y: player.y, 
+            lifeEnd: now + 15000
+        });
         if (!MUTE_SFX) playSfx(700, 'sine', 0.3);
     } else if (selectedChar === 'tan') {
         // THE SECOND: all bots disappear instantly
@@ -1323,9 +1374,9 @@ function useI() {
                 b.x = Math.max(1, Math.min(COLS - 2, b.x + (dx / d) * 5));
                 b.y = Math.max(1, Math.min(ROWS - 2, b.y + (dy / d) * 5));
                 b.isSlow = true;
-                b.slowEnd = now + 3500;
+                b.slowEnd = now + 4500;
                 b.isDelayed = true;
-                b.delayUntil = now + 1000;
+                b.delayUntil = now + 1500;
             }
         });
         bots.forEach(b => {
@@ -1385,7 +1436,7 @@ function useI() {
         });
         bots = bots.filter(b => !b.isDead);
     }
-    iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1);
+    iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.25 : 1);
 }
 
 function useO() {
@@ -1417,28 +1468,23 @@ function useO() {
             }, i * 150);
         }
     } else if (selectedChar === 'loi') {
-        bots.forEach(b => {
-            b.x += (b.x - player.x) * 4;
-            b.y += (b.y - player.y) * 4;
-            b.isDelayed = true;
-            b.delayUntil = now + 5000;
+        // BOUNCE BOMB: throw a bouncing object that kills bots on collision for 10s
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.25 + 0.075 * (currentLevel);
+        bounceObjects.push({
+            x: player.x,
+            y: player.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            lifeEnd: now + 10000,
+            radius: 0.45
         });
-        bots.forEach(b => {
-            if (checkCollision(b.x, b.y)) {
-                let dirs = [[0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]];
-                for (let dist = 0.1; dist < 4; dist += 0.1) {
-                    for (let [dx, dy] of dirs) {
-                        if (!checkCollision(b.x + dx * dist, b.y + dy * dist)) {
-                            b.x += dx * dist;
-                            b.y += dy * dist;
-                            break;
-                        }
-                    }
-                }
-            }
-        });
+        shakeAmount = 20;
         spawnShockwave(player.x, player.y, '#6366f1');
         audio.play("sfx", "loi-stagger");
+        objID = setTimeout(() => {
+            audio.play("sfx", "loi-whattheboom");
+        }, 8000);
     } else if (selectedChar === 'tan') {
         // HUNTER ULT: become hunter — touching bots destroys them, +0.25x speed per kill, lasts 30s
         player.isTanHunter = true;
@@ -1491,7 +1537,7 @@ function useO() {
             setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#38bdf8' : '#7dd3fc'), i * 80);
         }
     }
-    oCD = now + COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.5 : 1);
+    oCD = now + COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.25 : 1);
 }
 
 /**
@@ -1522,7 +1568,7 @@ function update(timestamp) {
         player.isDelayed = true;
         player.delayEnd = now + 3000;
         document.getElementById('warning-flash').classList.add('delay-warning');
-        audio.play("sfx", "quyen-delaying");
+        audio.play("sfx", `quyen-error${Math.floor(Math.random() * 3) + 1}`);
     }
 
     if (now > player.delayEnd) {
@@ -1532,8 +1578,8 @@ function update(timestamp) {
 
     // Miss Anh: Red Light Green Light skill (6s green - 1s red)
     if (selectedBot === 'anh') {
-        const lightCycleDuration = 7000; // 7 seconds per cycle
-        const redLightDuration = 750;     // 0.75 second red light
+        const lightCycleDuration = 8000; // 8 seconds per cycle
+        const redLightDuration = 1000;     // 1 second red light
         
         // Nếu đang bị phạt, tạm dừng chu kỳ đèn cho đến khi hết penalty
         let effectiveElapsed = elapsed;
@@ -1546,7 +1592,7 @@ function update(timestamp) {
         const isRedLight = cycleTime >= (lightCycleDuration - redLightDuration);
         
         // Determine which stage (1-4) based on cycle progress
-        let newPhase = Math.floor(cycleTime / 1750) + 1;
+        let newPhase = Math.floor(cycleTime / 2000) + 1;
         if (newPhase > 4) newPhase = 4;
         
         // Update light phase
@@ -1574,10 +1620,10 @@ function update(timestamp) {
         if (player.isAnhRedLight && player.isMoving && !player.isAnhBlinded) {
             // Player moved during red light - apply blindness and slow
             player.isAnhBlinded = true;
-            player.anhBlindedEnd = now + 2500; // 2.5 seconds blindness
+            player.anhBlindedEnd = now + 3000; // 3 seconds blindness
             player.anhPenaltyStart = effectiveElapsed; // Lưu thời điểm bắt đầu bị phạt
-            player.isSuperSlow = true;
-            player.superSlowEnd = now + 2500;
+            player.isSlow = true;
+            player.slowEnd = now + 3000;
             if (!isAnhBreak) isBreakingPlayed = false;
             isAnhBreak = true;
             shakeAmount = 15;
@@ -1594,9 +1640,9 @@ function update(timestamp) {
     }
     // Lerm movement
     let isLuomCanMove = false;
-    let tick = 500 - (currentLevel * 22.5) - (isCommonRage ? (8 * currentLevel) : 0) - (isHard ? (4 * currentLevel) : (3 * currentLevel));
+    let tick = 600 - (isCommonRage ? 30 : 25) * currentLevel - 20 * currentLevel;
     if (selectedBot === 'luom' && elapsed > tick && !(player.isQuangGravity && now < player.quangGravityEnd)) {
-        const luomDur = (isHard ? 85 : 65) + (isCommonRage ? (isHard ? 10 : 8) * currentLevel : 0);
+        const luomDur = (isHard ? 60 : 50) + 5 * currentLevel;
         if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0)
             isLuomCanMove = true;
     }
@@ -1692,20 +1738,20 @@ function update(timestamp) {
     player.isMoving = false;
     if (player.isSuperSlow) mult *= 0.25;
     if (player.isSlow) mult *= 0.525;
-    if (selectedChar === 'quang') mult *= 0.75;
+    if (selectedChar === 'quang') mult *= 0.85;
     if (player.isParrySuccess) {
         player.isFast = true;
         player.fastEnd = now + 1500;
         player.isParrySuccess = false;
-        iCD = Math.max(iCD - COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.5 : 1) / 2, now);
+        iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * 0.5);
     }
     if (player.isDelayed) mult = 0;
     else if (player.isParrying) mult = 0.015;
-    else {
+    else if (!player.isAnhBlinded) {
         if (player.isFast) mult *= 1.15;
         if (player.isCoffee) mult *= 1.25;
-        if (player.isLoiSpeed) mult *= 3.0;
-        if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.6);
+        if (player.isLoiSpeed) mult *= 2;
+        if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.65 : 1.75);
         if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) mult *= 2.0;
         if (selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd)
             mult *= (1.0 + player.tanUltKills * 0.25);
@@ -1849,7 +1895,11 @@ function update(timestamp) {
                 b.superRageEnd = now + (isHard ? 3000 : 3500) + 5000;
             }
         });
-
+        decoys.forEach((d, idx) => {
+            if (Math.sqrt((b.x - d.x) ** 2 + (b.y - d.y) ** 2) < 0.6)
+                d.lifeEnd = d.lifeEnd - (isCommonRage || b.isEnraged) ? 35 : 20;
+        });
+        decoys = decoys.filter(d => now < d.lifeEnd);
         if (now > freezeEnd && now > (b.delayUntil || 0)) {
             b.isDelayed = false;
             let target = (decoys.length > 0) ? decoys[0] : player;
@@ -1887,9 +1937,11 @@ function update(timestamp) {
                 b.delayUntil = now + 5000;
                 // explosion effect + sfx
                 if (!MUTE_SFX) playSfx(200, 'sine', 0.2);
-                spawnShockwave(player.x, player.y, '#ff0000');
-                spawnShockwave(player.x, player.y, '#ffa653');
-                spawnShockwave(player.x, player.y, '#ffffff');
+                for (let i = 0; i < 10; i++) {
+                    spawnShockwave(player.x, player.y, '#ff0000');
+                    spawnShockwave(player.x, player.y, '#ffa653');
+                    spawnShockwave(player.x, player.y, '#ffffff');
+                }
                 // rage after stunned
                 b.superEnraged = true;
                 b.superRageStart = now + 3000;
@@ -1911,6 +1963,8 @@ function update(timestamp) {
                 audio.stopChannel("sfx");
                 audio.stopChannel("music");
                 audio.play("sfx", "kill");
+                audio.play("music", "deaththeme");
+                clearTimeout(objID);
                 endGame(false, selectedBot);
             }
         }
@@ -1919,7 +1973,7 @@ function update(timestamp) {
     bots = bots.filter(b => !b.isDead);
     if (lpbots > bots.length){
         player.countKills = lpbots - bots.length
-        const kmult = (selectedChar === 'quang' ? 0.035 : 0.25) * player.countKills;
+        const kmult = (selectedChar === 'quang' ? 0.04 : 0.25) * player.countKills;
         yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * kmult);
         uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * kmult);
         iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * kmult);
@@ -1946,6 +2000,48 @@ function update(timestamp) {
         }
     });
     blackholes = blackholes.filter(bh => now < bh.lifeEnd && !bh.exploded);
+    // BOUNCE OBJECTS update (Loi [O])
+    bounceObjects = bounceObjects.filter(bo => now < bo.lifeEnd);
+    bounceObjects.forEach(bo => {
+        // Move
+        bo.x += bo.vx;
+        bo.y += bo.vy;
+        spawnTrail(bo.x, bo.y, '#6366f1');
+        // Bounce off walls
+        if (bo.x < 1.5 || bo.x > COLS - 1.5) {
+            bo.vx *= -1;
+            bo.x = Math.max(1.5, Math.min(COLS - 1.5, bo.x));
+        }
+        if (bo.y < 1.5 || bo.y > ROWS - 1.5) {
+            bo.vy *= -1;
+            bo.y = Math.max(1.5, Math.min(ROWS - 1.5, bo.y));
+        }
+        // Check collision with bots
+        bots.forEach(b => {
+            const dx = bo.x - b.x, dy = bo.y - b.y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < bo.radius + 0.45) {
+                b.isDead = true;
+                for (let i = 0; i < 6; i++) {
+                    setTimeout(() => {
+                        spawnShockwave(b.x, b.y, '#6366f1');
+                        spawnShockwave(b.x, b.y, '#a5b4fc');
+                    }, i * 150);
+                }
+                audio.play("sfx", "loi-explode");
+            }
+        });
+        bots = bots.filter(b => !b.isDead);
+        const dx = bo.x - player.x, dy = bo.y - player.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (bo.lifeEnd < now + 8500 && d < bo.radius + 0.45) {
+            clearTimeout(objID);
+            audio.stop("sfx", "loi-whattheboom");
+            audio.play("sfx", "loi-pickup");
+            bo.lifeEnd = now;
+            oCD = Math.max(now, oCD - COOLDOWNS[selectedChar].o * 0.5);
+        }
+    });
     blackholes.forEach(bh => {
         bh.radius = Math.min(bh.radius + 0.25, 8);
         bots.forEach(b => {
@@ -2043,6 +2139,7 @@ function update(timestamp) {
             decoys = [];
             shockwaves = [];
             blackholes = [];
+            bounceObjects = [];
             traps = [];
             startTime = now;
             player.x = 1.5;
@@ -2060,12 +2157,13 @@ function update(timestamp) {
             }
             if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) 
                 player.trungWindGodEnd = now + 4500;
-            audio.play("sfx", "new-level");
+            clearTimeout(objID);
             document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
             audio.stopChannel("sfx");
             audio.stopChannel("music");
-            audio.play("sfx", "win");
+            audio.play("music", "wintheme");
+            clearTimeout(objID);
             endGame(true, selectedBot);
         }
     }
@@ -2116,13 +2214,12 @@ function update(timestamp) {
         let color = selectedChar === 'dang' ? '#06b6d4' : (selectedChar === 'khang' ? '#fff' : '#6366f1');
         spawnTrail(player.x, player.y, color);
     }
-    if (selectedChar === 'quang' && player.isQuangJumping && now < player.quangJumpEnd) {
+    if (selectedChar === 'loi' && player.isLoiSpeed && now < player.loiSpeedEnd)
+        spawnTrail(player.x, player.y, '#6366f1');
+    if (selectedChar === 'quang' && player.isQuangJumping && now < player.quangJumpEnd)
         spawnTrail(player.x, player.y, 'rgba(251,191,36,0.7)');
-    }
-    if (selectedChar === 'quang' && player.isQuangGravity && now < player.quangGravityEnd) {
+    if (selectedChar === 'quang' && player.isQuangGravity && now < player.quangGravityEnd)
         spawnTrail(player.x, player.y, 'rgba(139,92,246,0.6)');
-    }
-    decoys = decoys.filter(d => now < d.lifeEnd);
 
     updateUI(now);
     draw(isCommonRage & isRageable);
@@ -2281,6 +2378,29 @@ function draw(inRage) {
         ctx.restore();
     });
 
+    // Draw bounce objects (Loi [O])
+    bounceObjects.forEach(bo => {
+        const cx = bo.x * TILE_SIZE, cy = bo.y * TILE_SIZE;
+        const pulse = 0.8 + 0.2 * Math.sin(nowDraw / 80);
+        // Outer glow
+        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 25; ctx.shadowColor = '#6366f1'; }
+        ctx.beginPath();
+        ctx.arc(cx, cy, bo.radius * TILE_SIZE * pulse * 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(99,102,241,0.3)';
+        ctx.fill();
+        // Core
+        ctx.beginPath();
+        ctx.arc(cx, cy, bo.radius * TILE_SIZE * 0.8, 0, Math.PI * 2);
+        ctx.fillStyle = '#818cf8';
+        ctx.fill();
+        // Inner highlight
+        ctx.beginPath();
+        ctx.arc(cx - TILE_SIZE * 0.1, cy - TILE_SIZE * 0.1, bo.radius * TILE_SIZE * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = '#c7d2fe';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    });
+
     decoys.forEach(d => drawEntity(
         d.x, d.y, 'rgba(255,255,255,0.3)', '#000'
     ));
@@ -2322,10 +2442,8 @@ function draw(inRage) {
     else if (selectedChar === 'tan') pCol = '#f94316';
     else if (selectedChar === 'trung') pCol = '#38bdf8';
 
-
-    if (selectedChar === 'dang' && player.isUlt && now < player.ultEnd) pCol = '#fbbf24';
-    if (selectedChar === 'dang' && player.isDelayed && now < player.ultEnd) pCol = '#475569';
-    if (selectedChar === 'dang' && player.isParrying && now < player.ultEnd) pCol = '#7ec8d5';
+    if (player.isDelayed && now < player.delayEnd) pCol = '#475569';
+    if (selectedChar === 'dang' && player.isParrying && now < player.parryEnd) pCol = '#7ec8d5';
     if (selectedChar === 'dang' && player.isGhost && now < player.ghostEnd) pCol = 'rgba(6, 182, 212, 0.5)';
     if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) pCol = '#facc15';
     if (selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd) pCol = '#ef4444';
@@ -2360,8 +2478,8 @@ function draw(inRage) {
     
     // Miss Anh: Red Light Green Light skill - draw stage indicator at top center
     if (selectedBot === 'anh' && gameActive) {
-        const lightCycleDuration = 7000;
-        const redLightDuration = 750;
+        const lightCycleDuration = 8000;
+        const redLightDuration = 1000;
         const elapsedDraw = nowDraw - startTime;
         
         // Nếu đang bị phạt, giữ nguyên stage tại thời điểm bị phạt
@@ -2378,7 +2496,7 @@ function draw(inRage) {
         const stageY = 40;
         
         // Determine which stage image to use (0-3 for array index)
-        const phase = Math.floor(cycleTime / 1750) + 1;
+        const phase = Math.floor(cycleTime / 2000) + 1;
         const stageIndex = phase - 1;
         
         ctx.save();
@@ -2421,7 +2539,7 @@ function draw(inRage) {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             // Add red tint
-            ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+            ctx.fillStyle = `rgba(239, 68, 68, 0.${player.anhBlindedEnd - now + 1000})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.restore();
         }
@@ -2525,6 +2643,7 @@ function resetGameState() {
     shockwaves = [];
     traps = [];
     blackholes = [];
+    bounceObjects = [];
     gameActive = false;
     gamePaused = false;
     pauseStart = 0;
@@ -2534,6 +2653,7 @@ function resetGameState() {
     lastBotSpawnTime = 0;
     shakeAmount = 0;
     showRoad = false;
+    objID = null;
     alarmSoundPlaying = false;
     isLuomMoveAudio = false;
     lastAnhState = null;
@@ -2584,6 +2704,7 @@ function resetGameState() {
 }
 
 function returnToSelection() {
+    audio.stopChannel("music");
     audio.play("music", "mainmenu");
     resetGameState();
     document.getElementById('game-over').classList.add('hidden');
@@ -2600,6 +2721,7 @@ function handleClickToStart() {
 }
 
 function returnToGame() {
+    audio.stopChannel("music");
     playChaseTheme()
     resetGameState();
     document.getElementById('game-over').classList.add('hidden');
