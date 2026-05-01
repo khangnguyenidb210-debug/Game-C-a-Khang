@@ -80,7 +80,7 @@ let mazeCache = null, mazeCacheRage = null; // Cache for rendered maze
 const COOLDOWNS = {
     khang: { y: 6000, u: 15000, i: 4000, o: 20000 },
     dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
-    loi: { y: 12500, u: 8000, i: 8000, o: 20000 },
+    loi: { y: 12000, u: 8000, i: 8000, o: 20000 },
     tan:  { y: 12000, u: 15000, i: 18000, o: 30000 },
     thoai: { y: 6000, u: 8000, i: 12000, o: 28000 },
     quang: { y: 12000, u: 18000, i: 8000, o: 25000 },
@@ -1470,14 +1470,14 @@ function useO() {
     } else if (selectedChar === 'loi') {
         // BOUNCE BOMB: throw a bouncing object that kills bots on collision for 10s
         const angle = Math.random() * Math.PI * 2;
-        const speed = 0.25 + 0.075 * (currentLevel);
+        const speed = 0.25 + 0.065 * (currentLevel);
         bounceObjects.push({
             x: player.x,
             y: player.y,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
             lifeEnd: now + 10000,
-            radius: 0.45
+            radius: 0.425 + 0.025 * (currentLevel)
         });
         shakeAmount = 20;
         spawnShockwave(player.x, player.y, '#6366f1');
@@ -1559,8 +1559,8 @@ function update(timestamp) {
     // Calculate time scale based on target FPS
     const timeScale = deltaTime / TARGET_FRAME_TIME;
     // BOT STATES
-    const rageCycle = 15000 - (selectedBot === 'luom' ? 5000 : 0) - (isHard ? 2000 : 0);
-    const rageDuration = 5000;
+    const rageCycle = 15000 + (selectedBot === 'tin' ? 2500 : 0);
+    const rageDuration = 5000 + (selectedBot === 'luom' ? 2500 : 0);
     const isCommonRage = isRageable && elapsed > 10000 && (elapsed % rageCycle) > (rageCycle - rageDuration);
     // BOT Specialty Logic
     // Queen delays the player for 3 seconds
@@ -1579,7 +1579,7 @@ function update(timestamp) {
     // Miss Anh: Red Light Green Light skill (6s green - 1s red)
     if (selectedBot === 'anh') {
         const lightCycleDuration = 8000; // 8 seconds per cycle
-        const redLightDuration = 1000;     // 1 second red light
+        const redLightDuration = 800;     // 0.8 second red light
         
         // Nếu đang bị phạt, tạm dừng chu kỳ đèn cho đến khi hết penalty
         let effectiveElapsed = elapsed;
@@ -1640,9 +1640,9 @@ function update(timestamp) {
     }
     // Lerm movement
     let isLuomCanMove = false;
-    let tick = 600 - (isCommonRage ? 30 : 25) * currentLevel - 20 * currentLevel;
+    let tick = 550 - (isCommonRage ? 45 : 22.5) * currentLevel;
     if (selectedBot === 'luom' && elapsed > tick && !(player.isQuangGravity && now < player.quangGravityEnd)) {
-        const luomDur = (isHard ? 60 : 50) + 5 * currentLevel;
+        const luomDur = (isHard ? 65 : 50) + (isCommonRage ? 7.5 : 5) * currentLevel;
         if ((elapsed % tick) < luomDur && !isLuomCanMove && freezeEnd < now && bots.length > 0)
             isLuomCanMove = true;
     }
@@ -1897,7 +1897,7 @@ function update(timestamp) {
         });
         decoys.forEach((d, idx) => {
             if (Math.sqrt((b.x - d.x) ** 2 + (b.y - d.y) ** 2) < 0.6)
-                d.lifeEnd = d.lifeEnd - (isCommonRage ? 25 : 20);
+                d.lifeEnd = d.lifeEnd - (isCommonRage ? 25 : 22.5);
         });
         decoys = decoys.filter(d => now < d.lifeEnd);
         if (now > freezeEnd && now > (b.delayUntil || 0)) {
@@ -2020,7 +2020,7 @@ function update(timestamp) {
         bots.forEach(b => {
             const dx = bo.x - b.x, dy = bo.y - b.y;
             const d = Math.sqrt(dx * dx + dy * dy);
-            if (d < bo.radius + 0.45) {
+            if (d < bo.radius + 0.5) {
                 b.isDead = true;
                 for (let i = 0; i < 6; i++) {
                     setTimeout(() => {
@@ -2479,7 +2479,7 @@ function draw(inRage) {
     // Miss Anh: Red Light Green Light skill - draw stage indicator at top center
     if (selectedBot === 'anh' && gameActive) {
         const lightCycleDuration = 8000;
-        const redLightDuration = 1000;
+        const redLightDuration = 800;
         const elapsedDraw = nowDraw - startTime;
         
         // Nếu đang bị phạt, giữ nguyên stage tại thời điểm bị phạt
