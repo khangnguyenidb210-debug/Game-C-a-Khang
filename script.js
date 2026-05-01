@@ -1897,7 +1897,7 @@ function update(timestamp) {
         });
         decoys.forEach((d, idx) => {
             if (Math.sqrt((b.x - d.x) ** 2 + (b.y - d.y) ** 2) < 0.6)
-                d.lifeEnd = d.lifeEnd - (isCommonRage || b.isEnraged) ? 35 : 20;
+                d.lifeEnd = d.lifeEnd - (isCommonRage ? 25 : 20);
         });
         decoys = decoys.filter(d => now < d.lifeEnd);
         if (now > freezeEnd && now > (b.delayUntil || 0)) {
