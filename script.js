@@ -1418,7 +1418,6 @@ function useI() {
         bots.forEach(b => {
             const wasHit = dashPositions.some(p => Math.sqrt((b.x - p.x) ** 2 + (b.y - p.y) ** 2) < 0.7);
             if (wasHit) {
-                // Spawn split effect (two shockwaves flying apart)
                 for (let s = 0; s < 5; s++) {
                     setTimeout(() => {
                         spawnShockwave(b.x + s * dx * 0.3, b.y + s * dy * 0.3, '#bfdbfe');
@@ -1482,8 +1481,12 @@ function useO() {
             setTimeout(() => {
                 const box = bounceObjects[0].x,
                       boy = bounceObjects[0].y;
-                spawnShockwave(box, boy, '#6366f1');
-                spawnShockwave(box, boy, '#000');
+                for (let i = 0; i < 6; i++) {
+                    setTimeout(() => {
+                        spawnShockwave(b.x, b.y, '#6366f1');
+                        spawnShockwave(b.x, b.y, '#a5b4fc');
+                    }, i * 150);
+                }
                 bots.forEach(b => {
                     const dx = box - b.x, dy = boy - b.y;
                     const d = Math.sqrt(dx * dx + dy * dy);
