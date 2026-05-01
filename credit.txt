@@ -1,8 +1,10 @@
 main-menu (Strike A Taunt - Outcome Memories) by Aerozity
-quyen-chase (NIGHTVISION - Live of Life) by scrumbo_
+quyen-chase (Attack of the Killer Queen - Deltarune) by Toby Fox
 anh-chase (SURREALSCAPE - Live of Life) by skwoopy
-tin-chase (Beyond The Bounds of Possibility - Die of Death) by PhilosArts
+tin-chase (Show no Tears) by NemesisTheory
 luom-chase (T0-B3-3RA5ED - Die Of Death) by TheEpikGamers
 setting-theme1 (Settings Theme - Die of Death) by AximSC
 setting-theme2 (Settings Theme - Live of Life) by Nasaki
 setting-theme3 (Badges Theme - Live of Life) by Nasaki
+death-theme (Dialtone - Deltarune) by Toby Fox
+win-theme (And Now For Today’s Sponsors…! - Deltarune) by Toby Fox
