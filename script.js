@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2.1";
+const version = "1.2.2";
 
 // GAME CONFIG - Tùy chỉnh tốc độ game (sẽ được load từ settings)
 // Xem thêm trong phần SETTINGS SYSTEM ở cuối file
@@ -78,13 +78,13 @@ var lastUpdateTime = 0, deltaTime = 0;
 let mazeCache = null, mazeCacheRage = null; // Cache for rendered maze
 
 const COOLDOWNS = {
-    khang: { y: 6000, u: 15000, i: 4000, o: 20000 },
+    khang: { y: 5000, u: 15000, i: 4500, o: 20000 },
     dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
     loi: { y: 12000, u: 8000, i: 8000, o: 20000 },
-    tan:  { y: 12000, u: 15000, i: 18000, o: 30000 },
-    thoai: { y: 6000, u: 8000, i: 12000, o: 28000 },
+    tan:  { y: 10000, u: 12000, i: 15000, o: 25000 },
+    thoai: { y: 5000, u: 8000, i: 10000, o: 22000 },
     quang: { y: 12000, u: 18000, i: 8000, o: 25000 },
-    trung: { y: 15000, u: 12000, i: 8000, o: 18000 }
+    trung: { y: 12000, u: 10000, i: 8000, o: 18000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -1502,12 +1502,12 @@ function useO() {
             }, 2000);
         }, 8000);
     } else if (selectedChar === 'tan') {
-        // HUNTER ULT: become hunter — touching bots destroys them, +0.25x speed per kill, lasts 30s
+        // HUNTER ULT: become hunter — touching bots destroys them, +0.25x speed per kill, lasts 10s
         player.isTanHunter = true;
-        player.tanHunterEnd = now + 30000;
+        player.tanHunterEnd = now + 10000;
         player.tanUltKills = 0;
         player.isInvincible = true;
-        player.invincibleEnd = now + 30000;
+        player.invincibleEnd = now + 10000;
         shakeAmount = 50;
         audio.play("sfx", "tan-hunter");
         for (let i = 0; i < 15; i++) {
@@ -1902,13 +1902,13 @@ function update(timestamp) {
         traps.forEach((t, idx) => {
             if (Math.sqrt((b.x - t.x) ** 2 + (b.y - t.y) ** 2) < 0.7) {
                 b.isDelayed = true;
-                b.delayUntil = now + (isHard ? 3000 : 3500);
+                b.delayUntil = now + (isHard ? 2500 : 3000);
                 spawnShockwave(t.x, t.y, '#fff');
                 traps.splice(idx, 1);
                 audio.play("sfx", "khang-trapcaught");
                 b.superEnraged = true;
-                b.superRageStart = now + (isHard ? 3000 : 3500);
-                b.superRageEnd = now + (isHard ? 3000 : 3500) + 5000;
+                b.superRageStart = now + (isHard ? 2500 : 3000);
+                b.superRageEnd = now + (isHard ? 2500 : 3000) + 5000;
             }
         });
         decoys.forEach((d, idx) => {
@@ -2833,9 +2833,10 @@ document.getElementById('start-btn').onclick = () => {
     audio.stop("music", "mainmenu");
     playChaseTheme()
     resetGameState();
+    currentLevel = 1;
     document.getElementById('selection-screen').classList.add('hidden');
     document.getElementById('game-ui').classList.remove('hidden');
-    currentLevel = 1;
+    document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
     generateMaze();
     gameActive = true;
     startTime = Date.now();
