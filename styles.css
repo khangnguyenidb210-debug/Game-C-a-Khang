@@ -320,3 +320,17 @@ body {
     from { background: transparent; }
     to   { background: rgba(239, 68, 68, 0.22); }
 }
+
+
+/* Mr Ting Error Board Animation */
+@keyframes tinErrorShake {
+    0% { transform: translateX(0) scale(0.8); opacity: 0; }
+    20% { transform: translateX(-8px) scale(1.05); opacity: 1; }
+    40% { transform: translateX(8px) scale(1.02); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+    100% { transform: translateX(0) scale(1); opacity: 1; }
+}
+.tin-error-board {
+    pointer-events: all;
+}

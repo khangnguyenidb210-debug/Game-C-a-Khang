@@ -3,7 +3,7 @@
  */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
-const version = "1.2.2";
+const version = "1.3 (build 1)";
 
 // GAME CONFIG - Tùy chỉnh tốc độ game (sẽ được load từ settings)
 // Xem thêm trong phần SETTINGS SYSTEM ở cuối file
@@ -62,11 +62,50 @@ let lastAnhState = null, isStateChanged = false;
 let isAnhBreak = false, isBreakingPlayed = true;
 let isLuomMoveAudio = false, isRaging = false;
 
+// Mr Lerm: Car summoning ability — every 10s, summon a car that runs through the maze
+let luomCars = []; // active cars: { x, y, dx, dy, speed, type, pathCells, pathIdx }
+let lastLuomCarTime = 0; // timestamp of last car summon
+
+// Mr Ting: Error board system — every 10s show 3 "Error!" boards, player must press Delete
+let tinErrorBoards = []; // array of active error board DOM elements
+let lastTinErrorTime = 0; // timestamp of last error spawn
+
+// ===== SHOP SYSTEM =====
+let playerCoins = 0;
+let abilitySlots = [null]; // P (nerfed: 1 slot only)
+let abilityCDs = [0]; // cooldown timestamps per slot
+
+const SHOP_ITEMS = [
+    { id: 'speed15', name: '1.5x Tốc Độ', desc: '5 giây', icon: '💨', cost: 225, duration: 5000, color: '#22d3ee', key: 'shop_speed15' },
+    { id: 'speed2', name: '2x Tốc Độ', desc: '3 giây', icon: '⚡', cost: 250, duration: 3000, color: '#38bdf8', key: 'shop_speed2' },
+    { id: 'speed5', name: '5x Tốc Độ', desc: '3 giây', icon: '🚀', cost: 550, duration: 3000, color: '#f97316', key: 'shop_speed5' },
+    { id: 'delay_bots', name: 'Delay Bots', desc: 'Dừng bot 2 giây', icon: '⏸', cost: 275, duration: 2000, color: '#a78bfa', key: 'shop_delay' },
+    { id: 'slow_bots', name: '0.5x Bot Speed', desc: 'Chậm bot 3 giây', icon: '🐢', cost: 300, duration: 3000, color: '#34d399', key: 'shop_slowbot' },
+    { id: 'blackhole', name: 'Hố Đen', desc: 'Hút & diệt bot 3 giây', icon: '🕳', cost: 600, duration: 3000, color: '#8b5cf6', key: 'shop_blackhole' },
+    { id: 'kill_all', name: 'Diệt Tất Cả', desc: 'Xóa toàn bộ bot', icon: '💀', cost: 850, duration: 0, color: '#ef4444', key: 'shop_killall' },
+    { id: 'hunter', name: 'Hunter Mode', desc: 'Tiêu diệt bot khi chạm 10 giây', icon: '🎯', cost: 1000, duration: 10000, color: '#fbbf24', key: 'shop_hunter' },
+];
+
+// Items the player has purchased (available to equip)
+let purchasedItems = {}; // { itemId: true/false }
+// In-game active ability states
+let shopAbilityActive = {
+    shop_speed15: false, shop_speed15End: 0,
+    shop_speed2: false, shop_speed2End: 0,
+    shop_speed5: false, shop_speed5End: 0,
+    shop_delay: false, shop_delayEnd: 0,
+    shop_slowbot: false, shop_slowbotEnd: 0,
+    shop_blackhole: false,
+    shop_killall: false,
+    shop_hunter: false, shop_hunterEnd: 0,
+};
+// ===== END SHOP SYSTEM =====
+
 // Global variables for settings (can be modified by settings system)
 var TARGET_FPS = 60;
 var TARGET_FRAME_TIME = 1000 / TARGET_FPS;
 var ENABLE_SHADOW_EFFECTS = false;
-var DEBUG_MODE = false;
+var DEBUG_MODE = true;
 var MAX_SHOCKWAVES = 25;
 var MAX_TRAILS = 20;
 var MAX_PARTICLES = 50;
@@ -82,9 +121,10 @@ const COOLDOWNS = {
     dang: { y: 8000, u: 10000, i: 12000, o: 18000 },
     loi: { y: 12000, u: 8000, i: 8000, o: 20000 },
     tan:  { y: 10000, u: 12000, i: 15000, o: 25000 },
-    thoai: { y: 5000, u: 8000, i: 10000, o: 22000 },
+    thoai: { y: 6000, u: 8000, i: 10000, o: 20000 },
     quang: { y: 12000, u: 18000, i: 8000, o: 25000 },
-    trung: { y: 12000, u: 10000, i: 8000, o: 18000 }
+    trung: { y: 12000, u: 10000, i: 8000, o: 18000 },
+    minh:  { y: 10000, u: 14000, i: 16000, o: 22000 }
 };
 const keys = { w: false, a: false, s: false, d: false };
 const links = { quyen: "https://www.onlinegdb.com/s/classroom/CWmpsFWGq",
@@ -115,18 +155,29 @@ function shiftTimers(delta) {
     player.parryEnd += delta;
     player.invincibleEnd += delta;
     player.superSlowEnd += delta;
+    // Tan timers
     player.tanGodEnd += delta;
     player.tanSharinganEnd += delta;
     player.tanHunterEnd += delta;
+    // Thoai timers
     player.thoaisuperSlowEnd += delta;
     player.thoaiBoostedEnd += delta;
     player.thoaiHunterEnd += delta;
     player.thoaiPenaltyEnd += delta;
+    // Trung timers
     player.trungWindGodEnd += delta;
     player.trungTiredEnd += delta;
     player.trungHasagiEnd += delta;
     player.trungDashEnd += delta;
     player.trungRasenganEnd += delta;
+    // Minh timers
+    if (player.minhBellAttackEnd) player.minhBellAttackEnd += delta;
+    if (player.minhBellEnd) player.minhBellEnd += delta;
+    if (player.minhBellAfterRageEnd) player.minhBellAfterRageEnd += delta;
+    if (player.minhIfElseBoostEnd) player.minhIfElseBoostEnd += delta;
+    if (player.minhPenaltyEnd) player.minhPenaltyEnd += delta;
+    if (player.minhGodEnd) player.minhGodEnd += delta;
+    if (player.minhGodSpeedEnd) player.minhGodSpeedEnd += delta;
     traps.forEach(t => t.life += delta);
     blackholes.forEach(b => b.lifeEnd += delta);
     decoys.forEach(d => d.lifeEnd += delta);
@@ -139,6 +190,14 @@ function shiftTimers(delta) {
         b.rageUntil += delta;
         b.slowEnd += delta;
     });
+    // SHOP: shift ability timers
+    shopAbilityActive.shop_speed15End += delta;
+    shopAbilityActive.shop_speed2End += delta;
+    shopAbilityActive.shop_speed5End += delta;
+    shopAbilityActive.shop_delayEnd += delta;
+    shopAbilityActive.shop_slowbotEnd += delta;
+    shopAbilityActive.shop_hunterEnd += delta;
+    for (let i = 0; i < 1; i++) if (abilityCDs[i] > 0) abilityCDs[i] += delta;
 }
 
 function resetInputKeys() {
@@ -331,347 +390,371 @@ audio.preload([
     {
         channel: "music",
         name: "quyen-chase",
-        src: "assets/quyen/chase.mp3",
+        src: "assets/quyen/chase.wav",
         config: { loop: true }
     },
     {
         channel: "sfx",
         name: "quyen-error1",
-        src: "assets/quyen/error1.mp3",
+        src: "assets/quyen/error1.wav",
         config: { volume: 0.6 }
     },
     {
         channel: "sfx",
         name: "quyen-error2",
-        src: "assets/quyen/error2.mp3"
+        src: "assets/quyen/error2.wav"
     },
     {
         channel: "sfx",
         name: "quyen-error3",
-        src: "assets/quyen/error3.mp3",
+        src: "assets/quyen/error3.wav",
         config: { volume: 0.7 }
     },
     // Anh's audio
     {
         channel: "music",
         name: "anh-chase",
-        src: "assets/anh/chase.mp3",
+        src: "assets/anh/chase.wav",
         config: { loop: true }
     },
     {
         channel: "sfx", 
         name: "anh-tick1",
-        src: "assets/anh/tick1.mp3"
+        src: "assets/anh/tick1.wav"
     },
     {
         channel: "sfx", 
         name: "anh-tick2",
-        src: "assets/anh/tick2.mp3",
+        src: "assets/anh/tick2.wav",
         config: { volume: 0.85 }
     },
     {
         channel: "sfx", 
         name: "anh-tick3",
-        src: "assets/anh/tick3.mp3",
+        src: "assets/anh/tick3.wav",
         config: { volume: 0.85 }
     },
     {
         channel: "sfx", 
         name: "anh-tick4",
-        src: "assets/anh/tick4.mp3",
+        src: "assets/anh/tick4.wav",
         config: { volume: 0.85 }
     },
     {
         channel: "sfx", 
         name: "anh-breaking",
-        src: "assets/anh/breaking.mp3",
+        src: "assets/anh/breaking.wav",
         config: { volume: 0.9 }
     },
     // Luom's audio
     {
         channel: "music",
         name: "luom-chase",
-        src: "assets/luom/chase.mp3",
+        src: "assets/luom/chase.wav",
         config: { volume: 0.85, loop: true }
     },
     {
         channel: "sfx",
         name: "luom-rage",
-        src: "assets/luom/rage.mp3",
+        src: "assets/luom/rage.wav",
         config: { volume: 0.7 }
     },
     {
         channel: "sfx",
         name: "luom-move",
-        src: "assets/luom/move.mp3",
-        config: { volume: 0.7 }
+        src: "assets/luom/move.wav",
+        config: { volume: 0.6 }
     },
     // Tin's audio
     {
         channel: "music",
         name: "tin-chase",
-        src: "assets/tin/chase.mp3",
+        src: "assets/tin/chase.wav",
         config: { volume: 0.7, loop: true }
     },
     // Khang's audio
     {
         channel: "sfx",
         name: "khang-dash1",
-        src: "assets/khang/dash1.mp3"
+        src: "assets/khang/dash1.wav"
     },
     {
         channel: "sfx",
         name: "khang-dash2",
-        src: "assets/khang/dash2.mp3"
+        src: "assets/khang/dash2.wav"
     },
     {
         channel: "sfx",
         name: "khang-letsgo",
-        src: "assets/khang/lets-go.mp3"
+        src: "assets/khang/lets-go.wav"
     },
     {
         channel: "sfx",
         name: "khang-timestop",
-        src: "assets/khang/time-stop.mp3"
+        src: "assets/khang/time-stop.wav"
     },
     {
         channel: "sfx",
         name: "khang-trapcaught",
-        src: "assets/khang/trap-caught.mp3",
+        src: "assets/khang/trap-caught.wav",
         config: { volume: 0.6 }
     },
     // Dang's audio
     {
         channel: "sfx",
         name: "dang-findpath",
-        src: "assets/dang/find-path.mp3"
+        src: "assets/dang/find-path.wav"
     },
     {
         channel: "sfx",
         name: "dang-missing",
-        src: "assets/dang/missing.mp3"
+        src: "assets/dang/missing.wav"
     },
     {
         channel: "sfx",
         name: "dang-parrying",
-        src: "assets/dang/parrying.mp3",
+        src: "assets/dang/parrying.wav",
         config: { volume: 0.8 }
     },
     {
         channel: "sfx",
         name: "dang-parrysucess",
-        src: "assets/dang/parry-sucess.mp3"
+        src: "assets/dang/parry-sucess.wav"
     },
     {
         channel: "sfx",
         name: "dang-punchsucess",
-        src: "assets/dang/punch-sucess.mp3",
+        src: "assets/dang/punch-sucess.wav",
         config: { volume: 0.6 }
     },
     {
         channel: "sfx",
         name: "dang-weave",
-        src: "assets/dang/weave.mp3"
+        src: "assets/dang/weave.wav"
     },
     // Loi's audio
     {
         channel: "sfx",
         name: "loi-speed",
-        src: "assets/loi/speed.mp3"
+        src: "assets/loi/speed.wav"
     },
     {
         channel: "sfx",
         name: "loi-stagger",
-        src: "assets/loi/stagger.mp3"
+        src: "assets/loi/stagger.wav"
     },
     {
         channel: "sfx",
         name: "loi-teleport",
-        src: "assets/loi/teleport.mp3",
-        config: { volume: 0.8 }
+        src: "assets/loi/teleport.wav",
+        config: { volume: 0.7 }
     },
     {
         channel: "sfx",
         name: "loi-explode",
-        src: "assets/loi/explode.mp3",
+        src: "assets/loi/explode.wav",
         config: { volume: 0.8 }
     },{
         channel: "sfx",
         name: "loi-pickup",
-        src: "assets/loi/pick-up.mp3",
+        src: "assets/loi/pick-up.wav",
         config: { volume: 0.8 }
     },
     {
         channel: "sfx",
         name: "loi-whattheboom",
-        src: "assets/loi/what-the-boom.mp3",
+        src: "assets/loi/what-the-boom.wav",
         config: { volume: 0.8 }
     },
     // Thoai's audio
     {
         channel: "sfx",
         name: "thoai-blackhole",
-        src: "assets/thoai/black-hole.mp3",
+        src: "assets/thoai/black-hole.wav",
         config: { volume: 0.7 }
     },
     {
         channel: "sfx",
         name: "thoai-mitombokhoradio",
-        src: "assets/thoai/mi-tom-bo-kho-radio.mp3",
+        src: "assets/thoai/mi-tom-bo-kho-radio.wav",
         config: { volume: 0.67 }
     },
     {
         channel: "sfx",
         name: "thoai-motcaichettruyenthong",
-        src: "assets/thoai/mot-cai-chet-truyen-thong.mp3",
+        src: "assets/thoai/mot-cai-chet-truyen-thong.wav",
         config: { volume: 0.67 }
     },
     {
         channel: "sfx",
         name: "thoai-ragebait",
-        src: "assets/thoai/ragebait.mp3"
+        src: "assets/thoai/ragebait.wav"
     },
     {
         channel: "sfx",
         name: "thoai-ragebaitsucess",
-        src: "assets/thoai/ragebait-sucess.mp3",
+        src: "assets/thoai/ragebait-sucess.wav",
         config: { volume: 0.67 }
     },
     // Quang's audio
     {
         channel: "sfx",
         name: "quang-burps",
-        src: "assets/quang/burps.mp3"
+        src: "assets/quang/burps.wav"
     },
     {
         channel: "sfx",
         name: "quang-landing",
-        src: "assets/quang/landing.mp3"
+        src: "assets/quang/landing.wav"
     },
     {
         channel: "sfx",
         name: "quang-nom",
-        src: "assets/quang/nom.mp3"
+        src: "assets/quang/nom.wav"
     },
     {
         channel: "sfx",
         name: "quang-stomp",
-        src: "assets/quang/stomp.mp3"
+        src: "assets/quang/stomp.wav"
     },
     {
         channel: "sfx",
         name: "quang-jump",
-        src: "assets/quang/jump.mp3",
+        src: "assets/quang/jump.wav",
         config: { volume: 0.85 }
     },
     // Tan's audio
     {
         channel: "sfx",
         name: "tan-delete",
-        src: "assets/tan/delete.mp3"
+        src: "assets/tan/delete.wav"
     },
     {
         channel: "sfx",
         name: "tan-hunter",
-        src: "assets/tan/hunter.mp3"
+        src: "assets/tan/hunter.wav"
     },
     {
         channel: "sfx",
         name: "tan-sasuke",
-        src: "assets/tan/sasuke.mp3",
+        src: "assets/tan/sasuke.wav",
         config: { volume: 0.85 }
     },
     {
         channel: "sfx",
         name: "tan-sharingan",
-        src: "assets/tan/sharingan.mp3"
+        src: "assets/tan/sharingan.wav"
     },
     // Trung's audio
     {
         channel: "sfx",
         name: "trung-thechildofthewindgod",
-        src: "assets/trung/the-child-of-the-wind-god.mp3",
+        src: "assets/trung/the-child-of-the-wind-god.wav",
         config: { volume: 0.5 }
     },
     {
         channel: "sfx",
         name: "trung-rasengan",
-        src: "assets/trung/rasengan.mp3",
+        src: "assets/trung/rasengan.wav",
         config: { volume: 0.7 }
     },
     {
         channel: "sfx",
         name: "trung-katanaschwing",
-        src: "assets/trung/katana-schwing.mp3",
+        src: "assets/trung/katana-schwing.wav",
         config: { volume: 0.55 }
     },
     {
         channel: "sfx",
         name: "trung-hasagi",
-        src: "assets/trung/hasagi.mp3",
+        src: "assets/trung/hasagi.wav",
         config: { volume: 0.8 }
     },
     {
         channel: "sfx",
         name: "trung-windhit",
-        src: "assets/trung/wind-hit.mp3"
+        src: "assets/trung/wind-hit.wav"
+    },
+    {
+        channel: "sfx",
+        name: "minh-bell",
+        src: "assets/minh/normal.wav",
+        config: { volume: 0.85 }
+    },
+    {
+        channel: "sfx",
+        name: "minh-ohyes",
+        src: "assets/minh/oh-yes.wav",
+        config: { volume: 0.9 }
+    },
+    {
+        channel: "sfx",
+        name: "minh-mathquestion",
+        src: "assets/minh/question.wav",
+        config: { volume: 0.8 }
+    },
+    {
+        channel: "sfx",
+        name: "minh-godbless",
+        src: "assets/minh/god-bless.wav",
+        config: { volume: 0.85 }
     },
     // Others audio
     {
         channel: "sfx",
         name: "click",
-        src: "assets/sfx/click.mp3"
+        src: "assets/sfx/click.wav"
     },
     {
         channel: "sfx",
         name: "kill",
-        src: "assets/sfx/kill.mp3"
+        src: "assets/sfx/kill.wav"
     },
     {
         channel: "sfx",
         name: "rage1",
-        src: "assets/sfx/rahhh.mp3"
+        src: "assets/sfx/rahhh.wav"
     },
     {
         channel: "sfx",
         name: "rage2",
-        src: "assets/sfx/waapp-angry.mp3"
+        src: "assets/sfx/waapp-angry.wav"
     },
     // Themes
     {
         channel: "music",
         name: "mainmenu",
-        src: "assets/themes/main-menu.mp3",
+        src: "assets/themes/main-menu.wav",
         config: { volume: 0.67, loop: true }
     },
     {
         channel: "music",
         name: "settingtheme1",
-        src: "assets/themes/setting-theme1.mp3",
+        src: "assets/themes/setting-theme1.wav",
         config: { volume: 0.67, loop: true }
     },
     {
         channel: "music",
         name: "settingtheme2",
-        src: "assets/themes/setting-theme2.mp3",
+        src: "assets/themes/setting-theme2.wav",
         config: { loop: true }
     },
     {
         channel: "music",
         name: "settingtheme3",
-        src: "assets/themes/setting-theme3.mp3",
+        src: "assets/themes/setting-theme3.wav",
         config: { loop: true }
     },
     {
         channel: "music",
         name: "wintheme",
-        src: "assets/themes/win-theme.mp3",
+        src: "assets/themes/win-theme.wav",
         config: { loop: true }
     },
     {
         channel: "music",
         name: "deaththeme",
-        src: "assets/themes/death-theme.mp3",
+        src: "assets/themes/death-theme.wav",
         config: { loop: true }
     }
 ]);
@@ -802,6 +885,23 @@ function checkCollision(x, y, ignoreWalls = false) {
         for (let j = l; j <= r; j++) {
             if (i <= 0 || i >= ROWS - 1 || j <= 0 || j >= COLS - 1) return true;
             if (player.isQuangJumping && Date.now() < player.quangJumpEnd) return false;
+            // MINH: God Blessed - break walls
+            if (selectedChar === 'minh' && player.isMinhGodBlessed && Date.now() < player.minhGodEnd) {
+                if (maze[i][j] === '#' || maze[i][j] === 'a') {
+                    // Break 4x4 block area around player
+                    const px = Math.floor(x), py = Math.floor(y);
+                    for (let br = py - 2; br <= py + 2; br++) {
+                        for (let bc = px - 2; bc <= px + 2; bc++) {
+                            if (br > 0 && br < ROWS-1 && bc > 0 && bc < COLS-1 && maze[br][bc] === '#') {
+                                maze[br][bc] = '.';
+                            }
+                        }
+                    }
+                    createMazeCache();
+                    createMazeCacheRage();
+                    return false;
+                }
+            }
             if (!ignoreWalls && (maze[i][j] === '#' || maze[i][j] === 'a')) return true;
         }
     }
@@ -1108,7 +1208,15 @@ function useY() {
             spawnShockwave(player.x, player.y, '#94a3b8');
             if (!MUTE_SFX) playSfx(200, 'sine', 0.3, 0.2, 100);
         }, 5000);
-        yCD = now + COOLDOWNS.trung.y * (selectedBot === 'anh' ? 1.25 : 1);
+        yCD = now + COOLDOWNS.trung.y * (selectedBot === 'anh' ? 1.5 : 1);
+    } else if (selectedChar === 'minh') {
+        // [Y] Bell Attack: 0.25x bot speed for 3s (nerfed from 3.5s)
+        player.isMinhBellAttack = true;
+        player.minhBellAttackEnd = now + 3000;
+        shakeAmount = 20;
+        for (let i = 0; i < 8; i++) setTimeout(() => spawnShockwave(player.x, player.y, i%2 ? '#fde047' : '#f59e0b'), i * 120);
+        audio.play("sfx", "minh-bell");
+        yCD = now + COOLDOWNS.minh.y * (selectedBot === 'anh' ? 1.5 : 1);
     }
 }
 
@@ -1271,6 +1379,23 @@ function useU() {
                 }
             }
         });
+    } else if (selectedChar === 'minh') {
+        // [U] Minh Bell: become bigger (1.4x speed), bots flee for 3s (nerfed), then 3x rage for 2s
+        player.isMinhBell = true;
+        player.minhBellEnd = now + 3000;
+        player.minhBellAfterRageEnd = now + 3000 + 2000;
+        shakeAmount = 30;
+        for (let i = 0; i < 12; i++) setTimeout(() => spawnShockwave(player.x, player.y, i%2 ? '#fbbf24' : '#fef08a'), i * 100);
+        audio.play("sfx", "minh-ohyes");
+        // Schedule rage warning at 3s (nerfed)
+        setTimeout(() => {
+            if (gameActive) {
+                shakeAmount = 40;
+                document.getElementById('warning-flash').classList.add('delay-warning');
+                if (!MUTE_SFX) playSfx(300, 'sawtooth', 0.4, 0.15, 600);
+                setTimeout(() => document.getElementById('warning-flash').classList.remove('delay-warning'), 2000);
+            }
+        }, 3000);
     }
     uCD = now + COOLDOWNS[selectedChar].u * (selectedBot === 'anh' ? 1.25 : 1);
 }
@@ -1429,6 +1554,10 @@ function useI() {
             }
         });
         bots = bots.filter(b => !b.isDead);
+    } else if (selectedChar === 'minh') {
+        // [I] If Else: show math question; correct = 2x speed + 0.25x bot 5s; wrong = 0.25x speed 3.5s
+        showMinhMathQuestion(now);
+        return; // iCD set inside showMinhMathQuestion after answer
     }
     iCD = now + COOLDOWNS[selectedChar].i * (selectedBot === 'anh' ? 1.25 : 1);
 }
@@ -1552,6 +1681,16 @@ function useO() {
         for (let i = 0; i < 10; i++) {
             setTimeout(() => spawnShockwave(player.x, player.y, i % 2 ? '#38bdf8' : '#7dd3fc'), i * 80);
         }
+    } else if (selectedChar === 'minh') {
+        // [O] Bless Bell: God Mode — white aura, break 4x4 walls on move, 2.5x speed 1.5s (nerfed from 3s)
+        player.isMinhGodBlessed = true;
+        player.minhGodEnd = now + 1500;
+        player.minhGodSpeedEnd = now + 1500;
+        shakeAmount = 50;
+        audio.play("sfx", "minh-godbless");
+        for (let i = 0; i < 16; i++) {
+            setTimeout(() => spawnShockwave(player.x, player.y, i % 3 === 0 ? '#ffffff' : i % 3 === 1 ? '#fde047' : '#fbbf24'), i * 80);
+        }
     }
     oCD = now + COOLDOWNS[selectedChar].o * (selectedBot === 'anh' ? 1.25 : 1);
 }
@@ -1570,7 +1709,7 @@ function update(timestamp) {
     
     const now = Date.now();
     const elapsed = now - startTime;
-    const isHard = gameMode === 'hard';
+    const isHard = gameMode === 'hard' || gameMode === 'infinity';
     const isRageable = (selectedBot !== 'anh');
     // Calculate time scale based on target FPS
     const timeScale = deltaTime / TARGET_FRAME_TIME;
@@ -1654,6 +1793,11 @@ function update(timestamp) {
             player.isAnhBlinded = false;
         }
     }
+    // Mr Ting: every 10s, spawn 3 Error! boards that block view until Delete is pressed
+    if (selectedBot === 'tin' && elapsed > 5000 && now - lastTinErrorTime > 10000 && tinErrorBoards.length === 0) {
+        lastTinErrorTime = now;
+        spawnTinErrorBoards();
+    }
     // Lerm movement
     let isLuomCanMove = false;
     let tick = 550 - (isCommonRage ? 45 : 22.5) * currentLevel;
@@ -1734,7 +1878,12 @@ function update(timestamp) {
     }
 
     // SPAWN
-    const maxBots = (isHard ? [5, 7, 11, 15, 18][currentLevel - 1] : [3, 6, 9, 12, 15][currentLevel - 1]);
+    const hardBotCounts = [5, 7, 11, 15, 18];
+    const normalBotCounts = [3, 6, 9, 12, 15];
+    // For infinity mode, cap the index at 4 but allow scaling beyond level 5
+    const botIdx = Math.min(currentLevel - 1, 4);
+    const infinityBonus = gameMode === 'infinity' ? Math.max(0, currentLevel - 5) * 2 : 0;
+    const maxBots = (isHard ? hardBotCounts[botIdx] : normalBotCounts[botIdx]) + infinityBonus;
     const spawnInterval = (isHard ? 2500 : 4000) - (selectedBot == 'luom' ? 1250 : 0);
     if (elapsed > 2000 - (selectedBot == 'luom' ? 1250 : 0) && (bots.length < maxBots) && (now - lastBotSpawnTime > spawnInterval)) {
         bots.push({
@@ -1749,7 +1898,7 @@ function update(timestamp) {
     }
 
     // PLAYER MOVE
-    let baseSpd = isHard ? 0.12 : 0.06 + ((isHard ? 0.05 : 0.015) * currentLevel);
+    let baseSpd = isHard ? 0.11 : 0.06 + ((isHard ? 0.035 : 0.012) * currentLevel);
     let mult = 1;
     player.isMoving = false;
     if (player.isSuperSlow) mult *= 0.25;
@@ -1766,8 +1915,20 @@ function update(timestamp) {
     else if (!player.isAnhBlinded) {
         if (player.isFast) mult *= 1.15;
         if (player.isCoffee) mult *= 1.25;
-        if (player.isLoiSpeed) mult *= 2;
-        if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.65 : 1.75);
+        if (player.isLoiSpeed) mult *= 3.0;
+        // SHOP ABILITIES: speed boosts
+        if (shopAbilityActive.shop_speed15 && now < shopAbilityActive.shop_speed15End) mult *= 1.5;
+        if (shopAbilityActive.shop_speed2 && now < shopAbilityActive.shop_speed2End) mult *= 2.0;
+        if (shopAbilityActive.shop_speed5 && now < shopAbilityActive.shop_speed5End) mult *= 5.0;
+        if (shopAbilityActive.shop_hunter && now < shopAbilityActive.shop_hunterEnd) mult *= 1.2;
+        // Minh skills
+        if (selectedChar === 'minh') {
+            if (player.isMinhPenalty && now < player.minhPenaltyEnd) mult *= 0.25;
+            if (player.isMinhBell && now < player.minhBellEnd) mult *= 1.4;
+            if (player.isMinhIfElseBoost && now < player.minhIfElseBoostEnd) mult *= 2.0;
+            if (player.isMinhGodBlessed && now < player.minhGodSpeedEnd) mult *= 2.5;
+        }
+        if (player.isUlt) mult *= (selectedChar === 'dang' ? 2.75 : 1.6);
         if (selectedChar === 'tan' && player.isTanGod && now < player.tanGodEnd) mult *= 2.0;
         if (selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd)
             mult *= (1.0 + player.tanUltKills * 0.25);
@@ -1801,6 +1962,18 @@ function update(timestamp) {
     }
     if (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd) {
         spawnTrail(player.x, player.y, 'rgba(250,204,21,0.8)');
+    }
+    // SHOP: Hunter mode trail
+    if (shopAbilityActive.shop_hunter && now < shopAbilityActive.shop_hunterEnd) {
+        spawnTrail(player.x, player.y, 'rgba(251,191,36,0.9)');
+    }
+    // MINH: God Blessed trail
+    if (selectedChar === 'minh' && player.isMinhGodBlessed && now < player.minhGodEnd) {
+        spawnTrail(player.x, player.y, 'rgba(255,255,255,0.95)');
+    }
+    // MINH: Bell Attack trail
+    if (selectedChar === 'minh' && player.isMinhBellAttack && now < player.minhBellAttackEnd) {
+        spawnTrail(player.x, player.y, 'rgba(251,191,36,0.6)');
     }
     if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) {
         spawnTrail(player.x, player.y, 'rgba(56,189,248,0.7)');
@@ -1865,10 +2038,73 @@ function update(timestamp) {
     }
     resolveWallStick();
 
+    // MR LERM: Car Summoning Ability — every 10s, summon a random car through the maze
+    if (selectedBot === 'luom' && elapsed > 3000 && now - lastLuomCarTime > 10000) {
+        lastLuomCarTime = now;
+        // Pick random car type: 33% slow (1.25x), 33% fast (2x), 33% light (5x)
+        const roll = Math.random();
+        let carType, carSpeed;
+        if (roll < 0.333) { carType = 'slow'; carSpeed = 1.25; }
+        else if (roll < 0.666) { carType = 'fast'; carSpeed = 2.0; }
+        else { carType = 'light'; carSpeed = 5.0; }
+        // Pick a random maze row that has open cells, spawn car from left edge going right, or top going down
+        const horizontal = Math.random() < 0.5;
+        // Find valid open row or column
+        let bestLine = -1;
+        if (horizontal) {
+            // Find a row with open cells running most of the width
+            const candidates = [];
+            for (let r = 1; r < ROWS - 1; r++) {
+                let openCount = 0;
+                for (let c = 0; c < COLS; c++) if (maze[r][c] !== '#' && maze[r][c] !== 'a') openCount++;
+                if (openCount >= COLS * 0.3) candidates.push(r);
+            }
+            if (candidates.length > 0) bestLine = candidates[Math.floor(Math.random() * candidates.length)];
+        } else {
+            const candidates = [];
+            for (let c = 1; c < COLS - 1; c++) {
+                let openCount = 0;
+                for (let r = 0; r < ROWS; r++) if (maze[r][c] !== '#' && maze[r][c] !== 'a') openCount++;
+                if (openCount >= ROWS * 0.3) candidates.push(c);
+            }
+            if (candidates.length > 0) bestLine = candidates[Math.floor(Math.random() * candidates.length)];
+        }
+        if (bestLine >= 0) {
+            const car = horizontal
+                ? { x: -1.5, y: bestLine, dx: 1, dy: 0, speed: carSpeed * 0.18, type: carType, horizontal: true }
+                : { x: bestLine, y: -1.5, dx: 0, dy: 1, speed: carSpeed * 0.18, type: carType, horizontal: false };
+            luomCars.push(car);
+            // Show warning
+            const warnEl = document.getElementById('luom-car-warn');
+            if (warnEl) {
+                const label = carType === 'slow' ? '🚗 SLOW CAR (1.25x)!' : carType === 'fast' ? '🏎️ FAST CAR (2x)!' : '⚡ LIGHT SPEED CAR (5x)!';
+                const color = carType === 'slow' ? '#facc15' : carType === 'fast' ? '#f97316' : '#a855f7';
+                warnEl.innerText = label;
+                warnEl.style.color = color;
+                warnEl.classList.remove('hidden');
+                setTimeout(() => warnEl.classList.add('hidden'), 2500);
+            }
+        }
+    }
+    // Update & check car collisions
+    luomCars = luomCars.filter(car => {
+        car.x += car.dx * car.speed;
+        car.y += car.dy * car.speed;
+        // Check collision with player
+        const dist = Math.sqrt((car.x - player.x) ** 2 + (car.y - player.y) ** 2);
+        if (dist < 0.8 && gameActive) {
+            endGame(false, selectedBot);
+            return false;
+        }
+        // Remove if out of bounds
+        if (car.x > COLS + 2 || car.y > ROWS + 2 || car.x < -3 || car.y < -3) return false;
+        return true;
+    });
+
     // BOT MOVE
-    let bSpdBase = (isHard ? 0.09 : 0.065) + (currentLevel * (isHard ? 0.0125 : 0.01));
+    let bSpdBase = (isHard ? 0.085 : 0.065) + (currentLevel * (isHard ? 0.015 : 0.01));
     if (selectedBot === 'tin') bSpdBase *= (isHard ? 2.0 : 1.75);
-    if (selectedBot === 'luom') bSpdBase = (isLuomCanMove ? (isHard ? 1.225 : 1.15) : 0);
+    if (selectedBot === 'luom') bSpdBase = (isLuomCanMove ? (isHard ? 1.2 : 1.15) : 0);
     if ((selectedBot === 'quyen' || selectedBot === 'anh') && isHard) bSpdBase *= 1.5;
 
     bots.forEach(b => {
@@ -1882,10 +2118,20 @@ function update(timestamp) {
         else if (isCommonRage) finalBSpd *= 2.0;
         if (player.isAnhBlinded) finalBSpd *= 2.0;
         if (b.isSlow) finalBSpd *= 0.35;
+        // SHOP: Delay all bots
+        if (shopAbilityActive.shop_delay && now < shopAbilityActive.shop_delayEnd) finalBSpd = 0;
+        // SHOP: Slow bots 0.5x
+        if (shopAbilityActive.shop_slowbot && now < shopAbilityActive.shop_slowbotEnd) finalBSpd *= 0.5;
+        // MINH: Bell Attack slow
+        if (selectedChar === 'minh' && player.isMinhBellAttack && now < player.minhBellAttackEnd) finalBSpd *= 0.25;
+        // MINH: If-Else correct answer bot slow
+        if (selectedChar === 'minh' && player.isMinhIfElseBoost && now < player.minhIfElseBoostEnd) finalBSpd *= 0.25;
+        // MINH: After MinhBell rage 3x
+        if (selectedChar === 'minh' && now > player.minhBellEnd && now < player.minhBellAfterRageEnd) finalBSpd *= 3.0;
         // Thoai [Y]: slow bots
         if (selectedChar === 'thoai' && b.thoaiSlowUntil && now < b.thoaiSlowUntil) finalBSpd *= 0.25;
         // Quang [Y] earthquake slow (0.25x for 2s after 3s delay)
-        if (now < b.quangEarthquakeSlowUntil && now >= (b.delayUntil || 0)) finalBSpd *= 0.25;
+        if (b.quangEarthquakeSlowUntil && now < b.quangEarthquakeSlowUntil && now >= (b.delayUntil || 0)) finalBSpd *= 0.25;
         // Quang [U] gravity frozen (bots can't move)
         if (b.quangGravityUntil && now < b.quangGravityUntil) finalBSpd = 0;
         if (now >= b.slowEnd) b.isSlow = false;
@@ -1918,9 +2164,18 @@ function update(timestamp) {
         decoys = decoys.filter(d => now < d.lifeEnd);
         if (now > freezeEnd && now > (b.delayUntil || 0)) {
             b.isDelayed = false;
+            // MINH: Bell skill — bots flee away from player
+            const minhBellFlee = selectedChar === 'minh' && player.isMinhBell && now < player.minhBellEnd;
             let target = (decoys.length > 0) ? decoys[0] : player;
             if (now > b.nextPathUpdate || b.currentPath.length === 0) {
-                b.currentPath = getPath(b.x, b.y, target.x, target.y);
+                if (minhBellFlee) {
+                    // flee: move away, pick a point on opposite side
+                    const fdx = b.x - player.x, fdy = b.y - player.y;
+                    const flen = Math.sqrt(fdx*fdx + fdy*fdy) || 1;
+                    const fleeTargetX = Math.max(1, Math.min(COLS-2, b.x + fdx/flen * 8));
+                    const fleeTargetY = Math.max(1, Math.min(ROWS-2, b.y + fdy/flen * 8));
+                    b.currentPath = getPath(b.x, b.y, fleeTargetX, fleeTargetY);
+                } else b.currentPath = getPath(b.x, b.y, target.x, target.y);
                 b.nextPathUpdate = now + (isCommonRage ? 100 : 150);
             }
             if (b.currentPath && b.currentPath.length > 1) {
@@ -1934,7 +2189,8 @@ function update(timestamp) {
         // collision with player
         if (Math.sqrt((player.x - b.x) ** 2 + (player.y - b.y) ** 2) < 0.6) {
             if ((selectedChar === 'tan' && player.isTanHunter && now < player.tanHunterEnd) ||
-                (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd)) {
+                (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd) ||
+                (shopAbilityActive.shop_hunter && now < shopAbilityActive.shop_hunterEnd)) {
                 spawnShockwave(b.x, b.y, '#facc15');
                 spawnShockwave(b.x, b.y, '#ef4444');
                 shakeAmount = 15;
@@ -1953,7 +2209,7 @@ function update(timestamp) {
                 b.delayUntil = now + 5000;
                 // explosion effect + sfx
                 if (!MUTE_SFX) playSfx(200, 'sine', 0.2);
-                for (let i = 0; i < 10; i++) {
+                for (let i = 0; i < 7; i++) {
                     spawnShockwave(player.x, player.y, '#ff0000');
                     spawnShockwave(player.x, player.y, '#ffa653');
                     spawnShockwave(player.x, player.y, '#ffffff');
@@ -1989,7 +2245,7 @@ function update(timestamp) {
     bots = bots.filter(b => !b.isDead);
     if (lpbots > bots.length){
         player.countKills = lpbots - bots.length
-        const kmult = (selectedChar === 'quang' ? 0.04 : 0.25) * player.countKills;
+        const kmult = (selectedChar === 'quang' ? 0.0425 : 0.25) * player.countKills;
         yCD = Math.max(now, yCD - COOLDOWNS[selectedChar].y * kmult);
         uCD = Math.max(now, uCD - COOLDOWNS[selectedChar].u * kmult);
         iCD = Math.max(now, iCD - COOLDOWNS[selectedChar].i * kmult);
@@ -2147,8 +2403,14 @@ function update(timestamp) {
 
     // LEVELING
     if (maze[Math.floor(player.y)][Math.floor(player.x)] === 'K' && !player.isQuangJumping) {
-        if (currentLevel < 5) {
-            currentLevel++;
+        // SHOP: Award coins for completing a level
+        const coinReward = (gameMode === 'hard' || gameMode === 'infinity') ? 100 : 50;
+        if (currentLevel < 5 || gameMode === 'infinity') {
+            playerCoins += coinReward;
+            saveShopData();
+            updateCoinDisplay();
+            showCoinToast(coinReward);
+            if (gameMode !== 'infinity') currentLevel++;
             generateMaze();
             bots = [];
             trails = [];
@@ -2173,10 +2435,17 @@ function update(timestamp) {
             }
             if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) 
                 player.trungWindGodEnd = now + 4500;
+            // Clear Mr Ting error boards on level up
+            clearTinErrorBoards();
+            luomCars = []; lastLuomCarTime = 0; // clear cars on level up
+            audio.play("sfx", "new-level");
+            document.getElementById('ui-level-text').innerText = gameMode === 'infinity' ? `LEVEL ${currentLevel} ♾️` : `LEVEL ${currentLevel}`;
             clearTimeout(objID);
             audio.stop("sfx", "loi-whattheboom");
-            document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
         } else {
+            playerCoins += coinReward;
+            saveShopData();
+            updateCoinDisplay();
             audio.stopChannel("sfx");
             audio.stopChannel("music");
             audio.play("music", "wintheme");
@@ -2259,7 +2528,32 @@ function update(timestamp) {
  * RENDER
  */
 function drawEntity(x, y, color, eyeColor, isBot = false, isEnraged = false) {
-    const size = (isBot ? 0.75 : 0.6) * TILE_SIZE;
+    // MINH: God Blessed white aura
+    if (!isBot && selectedChar === 'minh' && player.isMinhGodBlessed && Date.now() < player.minhGodEnd) {
+        const pulse = 0.6 + 0.4 * Math.sin(Date.now() / 80);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE * (0.8 + pulse * 0.3), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${0.12 + 0.08 * pulse})`;
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = '#ffffff';
+        ctx.fill();
+        ctx.restore();
+    }
+    // MINH: Bell Attack shockwave glow
+    if (!isBot && selectedChar === 'minh' && player.isMinhBellAttack && Date.now() < player.minhBellAttackEnd) {
+        const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 120);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE * (0.7 + pulse * 0.2), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(251,191,36,${0.1 + 0.08 * pulse})`;
+        ctx.shadowBlur = 20; ctx.shadowColor = '#fbbf24';
+        ctx.fill();
+        ctx.restore();
+    }
+    // MINH: MinhBell — draw player bigger
+    const isMinhBig = !isBot && selectedChar === 'minh' && player.isMinhBell && Date.now() < player.minhBellEnd;
+    const size = isMinhBig ? 0.9 * TILE_SIZE : (isBot ? 0.75 : 0.6) * TILE_SIZE;
     if (!isBot && player.isParrying && Date.now() < player.parryEnd) {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
@@ -2458,6 +2752,7 @@ function draw(inRage) {
     else if (selectedChar === 'quang') pCol = '#d97706';
     else if (selectedChar === 'tan') pCol = '#f94316';
     else if (selectedChar === 'trung') pCol = '#38bdf8';
+    else if (selectedChar === 'minh') pCol = '#fbbf24';
 
     if (player.isDelayed && now < player.delayEnd) pCol = '#475569';
     if (selectedChar === 'dang' && player.isParrying && now < player.parryEnd) pCol = '#7ec8d5';
@@ -2467,6 +2762,9 @@ function draw(inRage) {
     if (selectedChar === 'thoai' && player.isThoaiHunter && now < player.thoaiHunterEnd) pCol = '#facc15';
     if (selectedChar === 'thoai' && player.isThoaiBoosted && now < player.thoaiBoostedEnd) pCol = '#22c55e';
     if (selectedChar === 'thoai' && player.isThoaiPenalty && now < player.thoaiPenaltyEnd) pCol = '#475569';
+    if (selectedChar === 'minh' && player.isMinhGodBlessed && now < player.minhGodEnd) pCol = '#ffffff';
+    if (selectedChar === 'minh' && player.isMinhIfElseBoost && now < player.minhIfElseBoostEnd) pCol = '#4ade80';
+    if (selectedChar === 'minh' && player.isMinhPenalty && now < player.minhPenaltyEnd) pCol = '#475569';
     if (selectedChar === 'quang' && player.isQuangGravity && now < player.quangGravityEnd) pCol = '#c084fc';
     if (selectedChar === 'quang' && player.isQuangJumping && now < player.quangJumpEnd) pCol = '#fbbf24';
     if (selectedChar === 'trung' && player.isTrungWindGod && now < player.trungWindGodEnd) pCol = '#e0f2fe';
@@ -2611,6 +2909,50 @@ function draw(inRage) {
         drawEntity(b.x, b.y, bCol, '#000', true, inRage, superEnraged);
     });
 
+    // Draw Mr Lerm's summoned cars
+    luomCars.forEach(car => {
+        const cx = car.x * TILE_SIZE + TILE_SIZE / 2;
+        const cy = car.y * TILE_SIZE + TILE_SIZE / 2;
+        const carColor = car.type === 'slow' ? '#facc15' : car.type === 'fast' ? '#f97316' : '#c084fc';
+        const glowColor = car.type === 'slow' ? 'rgba(250,204,21,0.5)' : car.type === 'fast' ? 'rgba(249,115,22,0.5)' : 'rgba(192,132,252,0.6)';
+        ctx.save();
+        ctx.translate(cx, cy);
+        if (!car.horizontal) ctx.rotate(Math.PI / 2);
+        // Glow
+        if (ENABLE_SHADOW_EFFECTS) { ctx.shadowBlur = 18; ctx.shadowColor = carColor; }
+        // Car body
+        const w = TILE_SIZE * 1.4, h = TILE_SIZE * 0.7;
+        ctx.fillStyle = carColor;
+        ctx.beginPath();
+        ctx.roundRect(-w/2, -h/2, w, h, h * 0.3);
+        ctx.fill();
+        // Roof
+        ctx.fillStyle = car.type === 'light' ? '#e9d5ff' : '#fff';
+        ctx.beginPath();
+        ctx.roundRect(-w*0.25, -h/2 - h*0.35, w*0.5, h*0.4, h*0.15);
+        ctx.fill();
+        // Wheels
+        ctx.fillStyle = '#1f2937';
+        [[-w*0.3, h*0.35], [w*0.3, h*0.35]].forEach(([wx, wy]) => {
+            ctx.beginPath();
+            ctx.arc(wx, wy, h*0.22, 0, Math.PI*2);
+            ctx.fill();
+        });
+        // Speed lines for fast/light
+        if (car.type !== 'slow') {
+            ctx.strokeStyle = car.type === 'light' ? 'rgba(233,213,255,0.8)' : 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = car.type === 'light' ? 2 : 1;
+            for (let i = -1; i <= 1; i++) {
+                ctx.beginPath();
+                ctx.moveTo(-w*0.7, i * h*0.2);
+                ctx.lineTo(-w*1.1 - (car.type === 'light' ? TILE_SIZE : 0), i * h*0.2);
+                ctx.stroke();
+            }
+        }
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    });
+
     ctx.restore();
 }
 
@@ -2626,10 +2968,14 @@ function updateUI(now) {
     setCD('cd-u', uCD, cds.u);
     setCD('cd-i', iCD, cds.i);
     setCD('cd-o', oCD, cds.o);
+    // Update shop ability HUD
+    updateAbilityHUD();
 }
 
 function endGame(win, bot) {
     gameActive = false;
+    clearTinErrorBoards(); // remove Mr Ting error boards on end
+    luomCars = []; lastLuomCarTime = 0; // clear Lerm cars
     document.getElementById('game-over').classList.remove('hidden');
     if (win) {
         document.getElementById('end-title').innerText = "BẠN THẮNG!";
@@ -2673,10 +3019,13 @@ function resetGameState() {
     objID = null;
     alarmSoundPlaying = false;
     isLuomMoveAudio = false;
+    luomCars = [];
+    lastLuomCarTime = 0;
     lastAnhState = null;
     isStateChanged = false;
     isAnhBreak = false;
     isBreakingPlayed = true;
+    clearTinErrorBoards(); // clear Mr Ting error boards
     player = {
         x: 1.5, y: 1.5,
         isMoving: false, isCoffee: false, isGhost: false, isUlt: false,
@@ -2710,7 +3059,13 @@ function resetGameState() {
         isAnhRedLight: false,
         anhLightPhase: 0,
         anhLightCycle: 0,
-        anhPenaltyStart: 0
+        anhPenaltyStart: 0,
+        // Minh states
+        isMinhBellAttack: false, minhBellAttackEnd: 0,
+        isMinhBell: false, minhBellEnd: 0, minhBellAfterRageEnd: 0,
+        isMinhIfElseBoost: false, minhIfElseBoostEnd: 0,
+        isMinhPenalty: false, minhPenaltyEnd: 0,
+        isMinhGodBlessed: false, minhGodEnd: 0, minhGodSpeedEnd: 0
     };
     for (let i = 1; i < 5; i++)
         document.getElementById(`anh-stage${i}`).classList.add('hidden');
@@ -2727,6 +3082,7 @@ function returnToSelection() {
     document.getElementById('game-over').classList.add('hidden');
     document.getElementById('selection-screen').classList.remove('hidden');
     document.getElementById('game-ui').classList.add('hidden');
+    showAbilityHUD(false);
     setPauseOverlay(false);
 }
 
@@ -2741,6 +3097,7 @@ function returnToGame() {
     audio.stopChannel("music");
     playChaseTheme()
     resetGameState();
+    resetShopAbilities();
     document.getElementById('game-over').classList.add('hidden');
     document.getElementById('selection-screen').classList.add('hidden');
     document.getElementById('game-ui').classList.remove('hidden');
@@ -2762,9 +3119,10 @@ window.selectChar = (c) => {
         tan: '#f94316', 
         thoai: '#a78bfa', 
         quang: '#d97706', 
-        trung: '#38bdf8' 
+        trung: '#38bdf8',
+        minh: '#fbbf24'
     };
-    const charOrder = ['khang', 'dang', 'loi', 'tan', 'thoai', 'quang', 'trung'];
+    const charOrder = ['khang', 'dang', 'loi', 'thoai', 'quang', 'minh', 'tan', 'trung'];
     
     // Update tab buttons
     charOrder.forEach((id, index) => {
@@ -2772,13 +3130,13 @@ window.selectChar = (c) => {
         if (!tab) return;
         if (id === c) {
             tab.classList.remove('border-slate-700');
-            tab.classList.add(`border-${id === 'khang' ? 'green-400' : id === 'dang' ? 'cyan-400' : id === 'loi' ? 'indigo-400' : id === 'tan' ? 'orange-400' : id === 'thoai' ? 'violet-300' : id === 'trung' ? 'sky-400' : 'amber-500'}`);
+            tab.classList.add(`border-${id === 'khang' ? 'green-400' : id === 'dang' ? 'cyan-400' : id === 'loi' ? 'indigo-400' : id === 'tan' ? 'orange-400' : id === 'thoai' ? 'violet-300' : id === 'trung' ? 'sky-400' : id === 'minh' ? 'yellow-400' : 'amber-500'}`);
             tab.style.transform = 'scale(1.25)';
             tab.style.padding = '3px';
             tab.style.boxShadow = `0 0 25px ${colors[id]}`;
         } else {
             tab.classList.add('border-slate-700');
-            tab.classList.remove('border-green-400', 'border-cyan-400', 'border-indigo-400', 'border-orange-400', 'border-violet-300', 'border-amber-500', 'border-sky-400');
+            tab.classList.remove('border-green-400', 'border-cyan-400', 'border-indigo-400', 'border-orange-400', 'border-violet-300', 'border-amber-500', 'border-sky-400', 'border-yellow-400');
             tab.style.transform = 'scale(1)';
             tab.style.padding = '0px';
             tab.style.boxShadow = 'none';
@@ -2802,7 +3160,7 @@ window.selectChar = (c) => {
 };
 
 window.changeCharTab = (dir) => {
-    const charOrder = ['khang', 'dang', 'loi', 'thoai', 'quang', 'tan', 'trung'];
+    const charOrder = ['khang', 'dang', 'loi', 'thoai', 'quang', 'minh', 'tan', 'trung'];
     const currentIndex = charOrder.indexOf(selectedChar);
     let newIndex = currentIndex + dir;
     if (newIndex < 0) newIndex = charOrder.length - 1;
@@ -2819,7 +3177,10 @@ window.selectMode = (m) => {
     gameMode = m;
     document.getElementById('mode-normal').classList.toggle('selected-box', m === 'normal');
     document.getElementById('mode-hard').classList.toggle('selected-box', m === 'hard');
-    document.getElementById('ui-mode-badge').innerText = m === 'normal' ? 'CHẾ ĐỘ THƯỜNG' : 'CHẾ ĐỘ HARDCORE (CỰC KHÓ)';
+    const modeInfinity = document.getElementById('mode-infinity');
+    if (modeInfinity) modeInfinity.classList.toggle('selected-box', m === 'infinity');
+    const labels = { normal: 'CHẾ ĐỘ THƯỜNG', hard: 'CHẾ ĐỘ HARDCORE (CỰC KHÓ)', infinity: '♾️ CHẾ ĐỘ VÔ HẠN' };
+    document.getElementById('ui-mode-badge').innerText = labels[m] || labels.normal;
 };
 
 window.selectBot = (b) => {
@@ -2831,9 +3192,10 @@ window.selectBot = (b) => {
 
 document.getElementById('start-btn').onclick = () => {
     audio.stop("music", "mainmenu");
+    currentLevel = 1;
     playChaseTheme()
     resetGameState();
-    currentLevel = 1;
+    resetShopAbilities();
     document.getElementById('selection-screen').classList.add('hidden');
     document.getElementById('game-ui').classList.remove('hidden');
     document.getElementById('ui-level-text').innerText = `LEVEL ${currentLevel}`;
@@ -2856,6 +3218,8 @@ window.addEventListener('keydown', e => {
         if (k === 'u') useU();
         if (k === 'i') useI();
         if (k === 'o') useO();
+        // SHOP ABILITIES (nerfed: 1 slot, P key)
+        if (k === ' ') useShopAbility(0);
     }
 });
 
@@ -3009,7 +3373,7 @@ function resetSettings() {
     const defaultSettings = {
         game: {
             targetFPS: 60,
-            debugMode: false
+            debugMode: true
         },
         audio: {
             muteThemes: false,
@@ -3032,3 +3396,447 @@ function resetSettings() {
     applySettings(defaultSettings);
     loadSettingsToUI();
 }
+
+// =============================================
+// SHOP SYSTEM FUNCTIONS
+// =============================================
+
+function saveShopData() {
+    localStorage.setItem('shopCoins', JSON.stringify(playerCoins));
+    localStorage.setItem('shopPurchased', JSON.stringify(purchasedItems));
+    localStorage.setItem('shopSlots', JSON.stringify(abilitySlots));
+}
+
+function loadShopData() {
+    try {
+        const coins = localStorage.getItem('shopCoins');
+        if (coins !== null) playerCoins = JSON.parse(coins);
+        const purchased = localStorage.getItem('shopPurchased');
+        if (purchased !== null) purchasedItems = JSON.parse(purchased);
+        const slots = localStorage.getItem('shopSlots');
+        if (slots !== null) abilitySlots = JSON.parse(slots);
+    } catch(e) {}
+    updateCoinDisplay();
+}
+
+function updateCoinDisplay() {
+    const el = document.getElementById('shop-coin-display');
+    if (el) el.textContent = playerCoins + ' 🪙';
+    const big = document.getElementById('shop-coins-big');
+    if (big) big.textContent = playerCoins;
+}
+
+function showCoinToast(amount) {
+    const toast = document.createElement('div');
+    toast.textContent = '+' + amount + ' 🪙';
+    toast.style.cssText = `
+        position:fixed; bottom:120px; left:50%; transform:translateX(-50%);
+        background:#854d0e; border:2px solid #ca8a04; color:#fde047;
+        font-weight:900; font-size:1.4rem; padding:10px 28px; border-radius:50px;
+        z-index:9999; pointer-events:none; letter-spacing:0.1em;
+        animation: coinToastAnim 2s ease-out forwards;
+    `;
+    if (!document.getElementById('coin-toast-style')) {
+        const style = document.createElement('style');
+        style.id = 'coin-toast-style';
+        style.textContent = `
+            @keyframes coinToastAnim {
+                0%   { opacity:0; transform:translateX(-50%) translateY(20px); }
+                15%  { opacity:1; transform:translateX(-50%) translateY(0); }
+                70%  { opacity:1; }
+                100% { opacity:0; transform:translateX(-50%) translateY(-30px); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2100);
+}
+
+function openShop() {
+    updateCoinDisplay();
+    renderShopItems();
+    renderEquippedSlots();
+    document.getElementById('shop-modal').classList.remove('hidden');
+}
+
+function closeShop() {
+    document.getElementById('shop-modal').classList.add('hidden');
+    saveShopData();
+}
+
+function renderShopItems() {
+    const grid = document.getElementById('shop-items-grid');
+    if (!grid) return;
+    const equippedIds = abilitySlots.filter(s => s !== null).map(s => s.id);
+    grid.innerHTML = SHOP_ITEMS.map(item => {
+        const owned = purchasedItems[item.id];
+        const equipped = equippedIds.includes(item.id);
+        const canBuy = !owned && playerCoins >= item.cost;
+        const slotFull = equippedIds.length >= 1 && !equipped; // nerfed: max 1 slot
+        const slotLabel = equipped ? 'P' : '';
+        return `<div onclick="shopItemClick('${item.id}')" class="shop-item-card p-3 rounded-xl border-2 cursor-pointer transition-all select-none
+            ${equipped ? 'border-yellow-400 bg-yellow-400/10' : owned ? 'border-slate-500 bg-slate-800/60' : canBuy ? 'border-slate-600 bg-slate-900/60 hover:border-white/40' : 'border-slate-700 bg-slate-900/30 opacity-50 cursor-not-allowed'}"
+            style="border-color: ${equipped ? '#facc15' : owned ? '#6b7280' : canBuy ? item.color + '55' : ''};">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="text-2xl">${item.icon}</span>
+                <div class="flex-1">
+                    <div class="font-black text-sm text-white">${item.name}</div>
+                    <div class="text-xs text-slate-400">${item.desc}</div>
+                </div>
+                ${equipped ? `<span class="text-xs font-black bg-yellow-500/30 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/50">[${slotLabel}]</span>` : ''}
+                ${owned && !equipped ? `<span class="text-xs font-black bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full border border-green-500/30">✓ Có</span>` : ''}
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-xs font-bold" style="color:${item.color}">${item.cost} 🪙</span>
+                <span class="text-xs text-slate-400">
+                    ${owned ? (equipped ? 'Nhấn để bỏ' : (slotFull ? 'Đầy slot (max 1)' : 'Nhấn để trang bị')) : (canBuy ? 'Nhấn để mua' : `Thiếu ${item.cost - playerCoins}🪙`)}
+                </span>
+            </div>
+        </div>`;
+    }).join('');
+    document.getElementById('shop-slot-count').textContent = equippedIds.length;
+}
+
+function renderEquippedSlots() {
+    const keys = ['Space'];
+    abilitySlots.slice(0, 1).forEach((slot, i) => {
+        const el = document.getElementById('eq-slot-' + i);
+        const container = document.querySelector(`.equipped-slot[data-slot="${i}"]`);
+        if (!el || !container) return;
+        if (slot) {
+            const item = SHOP_ITEMS.find(it => it.id === slot.id);
+            el.textContent = item ? item.name : '';
+            container.style.borderColor = item ? item.color : '';
+            container.style.background = item ? item.color + '22' : '';
+        } else {
+            el.textContent = 'Trống';
+            container.style.borderColor = '';
+            container.style.background = '';
+        }
+    });
+}
+
+function shopItemClick(itemId) {
+    const item = SHOP_ITEMS.find(i => i.id === itemId);
+    if (!item) return;
+    const equippedIdx = abilitySlots.findIndex(s => s && s.id === itemId);
+    if (equippedIdx !== -1) {
+        // Unequip
+        abilitySlots[equippedIdx] = null;
+        renderShopItems();
+        renderEquippedSlots();
+        return;
+    }
+    if (!purchasedItems[itemId]) {
+        // Try to buy
+        if (playerCoins < item.cost) return;
+        playerCoins -= item.cost;
+        purchasedItems[itemId] = true;
+        updateCoinDisplay();
+    }
+    // Equip into first empty slot (max 1 slot nerfed)
+    const emptyIdx = abilitySlots.findIndex(s => s === null);
+    if (emptyIdx === -1 || emptyIdx >= 1) return; // full (max 1)
+    abilitySlots[emptyIdx] = { id: itemId };
+    renderShopItems();
+    renderEquippedSlots();
+    saveShopData();
+}
+
+function updateAbilityHUD() {
+    const hud = document.getElementById('ability-hud');
+    if (!hud) return;
+    const now = Date.now();
+    const keys = ['Space'];
+    hud.innerHTML = abilitySlots.slice(0, 1).map((slot, i) => {
+        if (!slot) return `<div class="flex flex-col items-center gap-0.5 opacity-20">
+            <div class="w-12 h-12 rounded-xl border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-600 font-bold text-xs">[${keys[i]}]</div>
+        </div>`;
+        const item = SHOP_ITEMS.find(it => it.id === slot.id);
+        if (!item) return '';
+        const used = slot.used;
+        const cd = abilityCDs[i];
+        const cdLeft = Math.max(0, cd - now);
+        const pct = item.duration > 0 ? Math.min(100, (cdLeft / item.duration) * 100) : 0;
+        return `<div class="flex flex-col items-center gap-0.5 ${used ? 'opacity-30' : ''}">
+            <div class="relative w-12 h-12 rounded-xl border-2 flex items-center justify-center text-xl overflow-hidden"
+                style="border-color:${item.color}; background:${item.color}22;">
+                ${pct > 0 ? `<div class="absolute bottom-0 left-0 w-full" style="height:${pct}%;background:${item.color}44;transition:height 0.1s"></div>` : ''}
+                <span class="z-10">${used ? '✗' : item.icon}</span>
+            </div>
+            <span class="text-xs font-bold text-white/80">[${keys[i]}]</span>
+        </div>`;
+    }).join('');
+}
+
+function useShopAbility(slotIndex) {
+    const slot = abilitySlots[slotIndex];
+    if (!slot || slot.used) return;
+    const item = SHOP_ITEMS.find(i => i.id === slot.id);
+    if (!item) return;
+    const now = Date.now();
+    slot.used = true;
+    abilityCDs[slotIndex] = now + item.duration;
+
+    if (!MUTE_SFX) playSfx(550, 'sine', 0.25, 0.2, 880);
+
+    switch(item.key) {
+        case 'shop_speed15':
+            shopAbilityActive.shop_speed15 = true;
+            shopAbilityActive.shop_speed15End = now + item.duration;
+            break;
+        case 'shop_speed2':
+            shopAbilityActive.shop_speed2 = true;
+            shopAbilityActive.shop_speed2End = now + item.duration;
+            break;
+        case 'shop_speed5':
+            shopAbilityActive.shop_speed5 = true;
+            shopAbilityActive.shop_speed5End = now + item.duration;
+            break;
+        case 'shop_delay':
+            shopAbilityActive.shop_delay = true;
+            shopAbilityActive.shop_delayEnd = now + item.duration;
+            break;
+        case 'shop_slowbot':
+            shopAbilityActive.shop_slowbot = true;
+            shopAbilityActive.shop_slowbotEnd = now + item.duration;
+            break;
+        case 'shop_blackhole':
+            // Spawn blackhole at player position
+            blackholes.push({
+                x: player.x, y: player.y,
+                radius: 0, maxRadius: 3,
+                lifeEnd: now + 3000,
+                exploded: false,
+                isShopBH: true
+            });
+            break;
+        case 'shop_killall':
+            bots.forEach(b => {
+                b.isDead = true;
+                spawnShockwave(b.x, b.y, '#ef4444');
+            });
+            shakeAmount = 40;
+            if (!MUTE_SFX) playSfx(200, 'sawtooth', 0.5, 0.4, 50);
+            break;
+        case 'shop_hunter':
+            shopAbilityActive.shop_hunter = true;
+            shopAbilityActive.shop_hunterEnd = now + item.duration;
+            break;
+    }
+    updateAbilityHUD();
+    spawnShockwave(player.x, player.y, item.color);
+}
+
+// Reset shop ability states at game start
+function resetShopAbilities() {
+    shopAbilityActive = {
+        shop_speed15: false, shop_speed15End: 0,
+        shop_speed2: false, shop_speed2End: 0,
+        shop_speed5: false, shop_speed5End: 0,
+        shop_delay: false, shop_delayEnd: 0,
+        shop_slowbot: false, shop_slowbotEnd: 0,
+        shop_blackhole: false,
+        shop_killall: false,
+        shop_hunter: false, shop_hunterEnd: 0,
+    };
+    // Reset slot used states for this run
+    abilitySlots = abilitySlots.map(s => s ? { id: s.id, used: false } : null).slice(0, 1);
+    abilityCDs = [0];
+    updateAbilityHUD();
+    const hud = document.getElementById('ability-hud');
+    if (hud) hud.classList.remove('hidden');
+}
+
+// Show/hide ability HUD with game
+function showAbilityHUD(show) {
+    const hud = document.getElementById('ability-hud');
+    if (hud) hud.classList.toggle('hidden', !show);
+}
+
+// Call loadShopData on startup
+loadShopData();
+
+
+// =============================================
+// MR TING: ERROR BOARD SYSTEM
+// =============================================
+
+function spawnTinErrorBoards() {
+    // Remove any existing boards first (safety)
+    tinErrorBoards.forEach(el => { if (el.parentNode) el.parentNode.removeChild(el); });
+    tinErrorBoards = [];
+
+    const positions = [
+        { top: '15%', left: '10%' },
+        { top: '35%', left: '50%', transform: 'translateX(-50%)' },
+        { top: '55%', left: '65%' }
+    ];
+
+    let dismissed = 0;
+
+    positions.forEach((pos, idx) => {
+        const board = document.createElement('div');
+        board.className = 'tin-error-board';
+        board.style.cssText = `
+            position: fixed;
+            z-index: 8000;
+            background: #c0c0c0;
+            border: 3px solid #808080;
+            border-top-color: #ffffff;
+            border-left-color: #ffffff;
+            padding: 0;
+            min-width: 280px;
+            max-width: 340px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            box-shadow: 4px 4px 0 #000;
+            user-select: none;
+            top: ${pos.top};
+            left: ${pos.left};
+            ${pos.transform ? 'transform:' + pos.transform + ';' : ''}
+            animation: tinErrorShake 0.4s ease-out;
+        `;
+        board.innerHTML = `
+            <div style="background:linear-gradient(to right,#000080,#1084d0);color:#fff;padding:3px 6px;font-size:12px;font-weight:bold;display:flex;justify-content:space-between;align-items:center;">
+                <span>⚠️ Error</span>
+                <span style="background:#c0c0c0;color:#000;border:2px solid;border-color:#fff #808080 #808080 #fff;padding:0 6px;font-size:11px;cursor:default;">✕</span>
+            </div>
+            <div style="padding:16px 20px 10px;text-align:center;">
+                <div style="font-size:2.5rem;margin-bottom:8px;">❌</div>
+                <div style="font-size:1.1rem;font-weight:900;color:#000;margin-bottom:6px;">Error!</div>
+                <div style="font-size:0.75rem;color:#444;margin-bottom:14px;">Nhấn <kbd style="background:#e0e0e0;border:2px solid;border-color:#fff #808080 #808080 #fff;padding:1px 5px;font-weight:bold;">Delete</kbd> để đóng</div>
+                <button class="tin-error-dismiss" style="
+                    padding:4px 24px;background:#c0c0c0;border:2px solid;
+                    border-color:#fff #808080 #808080 #fff;
+                    font-size:0.8rem;cursor:pointer;font-weight:bold;
+                ">OK</button>
+            </div>
+        `;
+        document.body.appendChild(board);
+        tinErrorBoards.push(board);
+
+        // Allow clicking OK button too
+        board.querySelector('.tin-error-dismiss').addEventListener('click', () => dismissBoard(board));
+    });
+
+    function dismissBoard(board) {
+        if (!board.parentNode) return;
+        board.parentNode.removeChild(board);
+        tinErrorBoards = tinErrorBoards.filter(b => b !== board);
+        if (tinErrorBoards.length === 0) {
+            // All dismissed — resume normal (remove any slowdown)
+        }
+    }
+
+    // Listen for Delete key to dismiss boards one at a time
+    function onDelete(e) {
+        if (e.key === 'Delete' && tinErrorBoards.length > 0) {
+            const board = tinErrorBoards[0];
+            dismissBoard(board);
+            if (tinErrorBoards.length === 0) {
+                window.removeEventListener('keydown', onDelete);
+            }
+        }
+    }
+    window.addEventListener('keydown', onDelete);
+}
+
+function clearTinErrorBoards() {
+    tinErrorBoards.forEach(el => { if (el.parentNode) el.parentNode.removeChild(el); });
+    tinErrorBoards = [];
+    lastTinErrorTime = 0;
+}
+
+// =============================================
+// MINH CHARACTER FUNCTIONS
+// =============================================
+
+function showMinhMathQuestion(activatedNow) {
+    if (document.getElementById('minh-math-overlay')) return; // prevent double
+    // Pause bots movement via freeze (just 6s max)
+    const prev = gamePaused;
+    // Generate simple addition question < 10
+    const a = Math.floor(Math.random() * 5) + 1;
+    const b = Math.floor(Math.random() * (9 - a)) + 1;
+    const correctAnswer = a + b;
+    const deadline = Date.now() + 5000;
+    audio.play("sfx", "minh-mathquestion");
+
+    const overlay = document.createElement('div');
+    overlay.id = 'minh-math-overlay';
+    overlay.style.cssText = `
+        position:fixed; inset:0; z-index:9000;
+        background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center;
+        pointer-events:all;
+    `;
+    overlay.innerHTML = `
+        <div style="background:#1e293b; border:3px solid #fbbf24; border-radius:20px; padding:32px 40px; text-align:center; max-width:340px; width:90%;">
+            <div style="font-size:2.5rem; margin-bottom:8px;">🔔 If Else</div>
+            <div style="color:#fde047; font-size:1rem; font-weight:900; letter-spacing:0.15em; text-transform:uppercase; margin-bottom:12px;">Trả lời đúng để nhận buff!</div>
+            <div id="minh-math-timer-bar" style="height:6px; background:#334155; border-radius:4px; margin-bottom:20px; overflow:hidden;">
+                <div id="minh-math-timer-fill" style="height:100%; background:#fbbf24; width:100%; transition:width 0.1s linear; border-radius:4px;"></div>
+            </div>
+            <div style="font-size:3rem; font-weight:900; color:#ffffff; margin-bottom:20px;">${a} + ${b} = ?</div>
+            <input id="minh-math-input" type="number" min="0" max="20" autofocus
+                style="font-size:2rem; font-weight:900; text-align:center; width:120px; padding:8px 16px;
+                border-radius:12px; border:2px solid #fbbf24; background:#0f172a; color:#fde047;
+                outline:none;"
+            />
+            <br/><br/>
+            <button id="minh-math-submit"
+                style="padding:10px 36px; border-radius:50px; background:#fbbf24; color:#000;
+                font-weight:900; font-size:1rem; border:none; cursor:pointer; text-transform:uppercase; letter-spacing:0.1em;">
+                Trả lời [Enter]
+            </button>
+            <div id="minh-math-hint" style="color:#94a3b8; font-size:0.75rem; margin-top:10px;">Còn <span id="minh-math-secs">5</span>s để trả lời</div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    const input = document.getElementById('minh-math-input');
+    setTimeout(() => { if (input) input.focus(); }, 50);
+
+    // Timer bar
+    const timerInterval = setInterval(() => {
+        const remaining = deadline - Date.now();
+        const pct = Math.max(0, (remaining / 5000) * 100);
+        const fill = document.getElementById('minh-math-timer-fill');
+        const secs = document.getElementById('minh-math-secs');
+        if (fill) fill.style.width = pct + '%';
+        if (secs) secs.textContent = Math.ceil(remaining / 1000);
+        if (remaining <= 0) submitAnswer(false);
+    }, 100);
+
+    function submitAnswer(fromTimer) {
+        clearInterval(timerInterval);
+        const val = parseInt(input ? input.value : '-1', 10);
+        const correct = fromTimer ? false : (val === correctAnswer);
+        overlay.remove();
+        const now2 = Date.now();
+        if (correct) {
+            player.isMinhIfElseBoost = true;
+            player.minhIfElseBoostEnd = now2 + 3000; // nerfed from 5s to 3s
+            shakeAmount = 25;
+            for (let i = 0; i < 10; i++) setTimeout(() => spawnShockwave(player.x, player.y, i%2 ? '#4ade80' : '#bbf7d0'), i * 80);
+            if (!MUTE_SFX) playSfx(600, 'sine', 0.3, 0.2, 1200);
+        } else {
+            player.isMinhPenalty = true;
+            player.minhPenaltyEnd = now2 + 3000; // nerfed from 3.5s to 3s
+            shakeAmount = 15;
+            spawnShockwave(player.x, player.y, '#ef4444');
+            if (!MUTE_SFX) playSfx(150, 'sawtooth', 0.4, 0.15, 80);
+        }
+        iCD = now2 + COOLDOWNS.minh.i * (selectedBot === 'anh' ? 1.5 : 1);
+    }
+
+    document.getElementById('minh-math-submit').onclick = () => submitAnswer(false);
+    // Allow Enter key
+    overlay.addEventListener('keydown', e => {
+        if (e.key === 'Enter') submitAnswer(false);
+    });
+    // Auto fail after 5s
+    setTimeout(() => {
+        if (document.getElementById('minh-math-overlay')) submitAnswer(true);
+    }, 5100);
+}
+
